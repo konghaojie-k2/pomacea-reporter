@@ -31,14 +31,15 @@ metadata:
 
 ## API 信息
 
-> ✅ **后端已部署在阿里云**，`master` 分支推送后自动部署
+> ✅ **后端已部署在阿里云（Docker 容器）**，前后端一体化服务
 
 | 环境 | 地址 |
 |------|------|
-| **生产 API** | `https://47.85.36.226:9000/api` |
+| **生产前台** | `http://47.85.36.226:9000/` |
+| **生产 API** | `http://47.85.36.226:9000/api` |
 | **本地开发** | `http://localhost:9000/api` |
 
-**自动部署：** `git push` → GitHub Actions → 阿里云服务器自动更新
+**自动部署：** `git push master` → GitHub Actions → 服务器自动执行 `docker compose up -d --build`
 
 ---
 
