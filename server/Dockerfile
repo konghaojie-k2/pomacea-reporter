@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY main.py .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3001"]
+COPY index.py .
+COPY frontend.html .
+ENV PORT=9000
+EXPOSE 9000
+CMD ["python3", "-u", "index.py"]
