@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐌 福寿螺分布地图 | Pomacea Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --green: #2d7a4f;
+      --green-light: #e8f5ee;
+      --green-dark: #1a5435;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --gray-50: #f9fafb;
+      --gray-200: #e5e7eb;
+      --gray-500: #6b7280;
+      --gray-900: #111827;
+      --red: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Noto Sans SC', sans-serif; color: var(--gray-900); background: var(--gray-50); }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+      color: white;
+      padding: 1.5rem 2rem;
+      position: sticky; top: 0; z-index: 1000;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+    header .inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-icon { font-size: 2rem; }
+    .brand h1 { font-size: 1.4rem; font-weight: 700; }
+    .brand span { opacity: 0.85; font-size: 0.875rem; }
+    .stats { display: flex; gap: 1.5rem; }
+    .stat { text-align: center; }
+    .stat strong { font-size: 1.5rem; display: block; }
+    .stat small { opacity: 0.8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Hero alert */
+    .hero-alert {
+      background: var(--amber-light);
+      border-left: 4px solid var(--amber);
+      padding: 0.75rem 1.5rem;
+      font-size: 0.875rem;
+      color: #92400e;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* Layout */
+    .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 120px); }
+    @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+
+    /* Sidebar */
+    .sidebar { background: white; border-right: 1px solid var(--gray-200); overflow-y: auto; padding: 1rem; }
+    .panel { background: var(--green-light); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+    .panel h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 0.5rem; }
+    .form-group { margin-bottom: 0.75rem; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--gray-500); margin-bottom: 0.25rem; }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200);
+      border-radius: 8px; font-size: 0.875rem; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--green); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+      width: 100%; padding: 0.65rem 1rem; border: none; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--green); color: white; }
+    .btn-primary:hover { background: var(--green-dark); transform: translateY(-1px); }
+    .btn-outline { background: transparent; border: 2px solid var(--green); color: var(--green); }
+    .btn-outline:hover { background: var(--green-light); }
+
+    .record-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .record-card {
+      background: white; border: 1px solid var(--gray-200); border-radius: 10px;
+      padding: 0.75rem; cursor: pointer; transition: all 0.2s;
+    }
+    .record-card:hover { border-color: var(--green); box-shadow: 0 2px 8px rgba(45,122,79,0.12); }
+    .record-card .rc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+    .record-card .rc-note { font-size: 0.8rem; color: var(--gray-500); }
+    .record-card .rc-time { font-size: 0.7rem; color: var(--gray-500); }
+    .record-badge { background: var(--red); color: white; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 20px; }
+
+    /* Map */
+    #map { width: 100%; height: 100%; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; }
+    .popup-content { min-width: 180px; }
+    .popup-content h4 { margin-bottom: 0.4rem; color: var(--green); font-size: 0.9rem; }
+    .popup-content p { font-size: 0.78rem; color: var(--gray-500); margin-bottom: 0.25rem; }
+    .popup-content small { font-size: 0.7rem; color: var(--gray-500); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="brand">
+      <span class="brand-icon">🐌</span>
+      <div>
+        <h1>福寿螺分布地图</h1>
+        <span>实时举报 · 协同守护生态</span>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><strong id="count-total">--</strong><small>举报总数</small></div>
+      <div class="stat"><strong id="count-today">--</strong><small>今日新增</small></div>
+    </div>
+  </div>
+</header>
+
+<div class="hero-alert">
+  ⚠️ 福寿螺是全球100种最具破坏力入侵物种之一，发现请立即上报！
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <!-- 上报表单 -->
+    <div class="panel">
+      <h3>📍 上报新发现</h3>
+      <div class="form-group">
+        <label>纬度</label>
+        <input type="number" id="f-lat" step="0.0001" placeholder="例：31.2989" />
+      </div>
+      <div class="form-group">
+        <label>经度</label>
+        <input type="number" id="f-lng" step="0.0001" placeholder="例：120.6853" />
+      </div>
+      <div class="form-group">
+        <label>描述</label>
+        <textarea id="f-note" rows="2" placeholder="描述发现地点或环境..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>地址（可选）</label>
+        <input type="text" id="f-addr" placeholder="例：苏州金鸡湖" />
+      </div>
+      <button class="btn btn-primary" onclick="submitRecord()">🐌 上报记录</button>
+      <div id="form-msg" style="margin-top:0.5rem;font-size:0.8rem;text-align:center;"></div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="panel">
+      <h3>📋 最近记录 (<span id="list-count">0</span>)</h3>
+      <div class="record-list" id="record-list"></div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const API = 'https://ew35zvt7xrey.space.minimaxi.com/api';
+  const map = L.map('map').setView([31.0, 120.6], 8);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  const markers = {};
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  function renderPopup(r) {
+    return `<div class="popup-content">
+      <h4>🐌 福寿螺发现点</h4>
+      <p>${r.note || '无描述'}</p>
+      <p>📍 ${r.address || '未知地址'}</p>
+      <small>🗓 ${fmtDate(r.createdAt)}</small>
+      ${r.photo ? `<br><img src="${r.photo}" style="max-width:100%;margin-top:0.4rem;border-radius:6px;" />` : ''}
+    </div>`;
+  }
+
+  function addMarker(r) {
+    const key = r.id;
+    if (markers[key]) { map.removeLayer(markers[key]); }
+    const m = L.marker([r.lat, r.lng])
+      .bindPopup(renderPopup(r));
+    markers[key] = m;
+    m.addTo(map);
+  }
+
+  async function loadRecords() {
+    try {
+      const res = await fetch(`${API}/records`);
+      const data = await res.json();
+      const records = data.records || [];
+
+      document.getElementById('count-total').textContent = records.length;
+
+      const today = new Date().toDateString();
+      const todayCount = records.filter(r => new Date(r.createdAt).toDateString() === today).length;
+      document.getElementById('count-today').textContent = todayCount;
+      document.getElementById('list-count').textContent = records.length;
+
+      const list = document.getElementById('record-list');
+      list.innerHTML = '';
+
+      // 按时间倒序
+      const sorted = [...records].reverse().slice(0, 20);
+      sorted.forEach(r => {
+        addMarker(r);
+        const el = document.createElement('div');
+        el.className = 'record-card';
+        el.innerHTML = `
+          <div class="rc-header">
+            <span class="record-badge">🐌</span>
+            <span class="rc-time">${fmtDate(r.createdAt)}</span>
+          </div>
+          <div class="rc-note">${r.address || r.note || '无描述'}</div>
+        `;
+        el.onclick = () => {
+          map.setView([r.lat, r.lng], 14);
+          markers[r.id].openPopup();
+        };
+        list.appendChild(el);
+      });
+    } catch (e) {
+      console.error('加载失败:', e);
+    }
+  }
+
+  async function submitRecord() {
+    const lat = parseFloat(document.getElementById('f-lat').value);
+    const lng = parseFloat(document.getElementById('f-lng').value);
+    const note = document.getElementById('f-note').value;
+    const address = document.getElementById('f-addr').value;
+    const msg = document.getElementById('form-msg');
+
+    if (!lat || !lng || !note) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = '⚠️ 请填写纬度、经度和描述';
+      return;
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = '⚠️ 坐标超出合法范围';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng, note, address }),
+      });
+      if (!res.ok) throw new Error('提交失败');
+      const r = await res.json();
+
+      msg.style.color = 'var(--green)';
+      msg.textContent = '✅ 上报成功！';
+
+      document.getElementById('f-lat').value = '';
+      document.getElementById('f-lng').value = '';
+      document.getElementById('f-note').value = '';
+      document.getElementById('f-addr').value = '';
+
+      addMarker(r);
+      map.setView([r.lat, r.lng], 13);
+      markers[r.id].openPopup();
+
+      loadRecords();
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    } catch (e) {
+      msg.style.color = 'var(--red)';
+      msg.textContent = '❌ 上报失败，请重试';
+    }
+  }
+
+  loadRecords();
+</script>
+</body>
+</html>

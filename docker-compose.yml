@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./server
+    container_name: pomacea-api
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server/records.json:/app/records.json
+    environment:
+      - DATA_FILE=/app/records.json
+      - API_PORT=3001
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: pomacea-web
+    ports:
+      - "8080:80"
+    environment:
+      - API_BASE=http://api:3001/api
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  default:
+    name: pomacea-net
