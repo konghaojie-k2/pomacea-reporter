@@ -50,7 +50,7 @@ def handle(req, path, body=b""):
     p = urlparse(path).path.rstrip("/")
 
     # 前端页面
-    if p in ("/", "/index.html"):
+    if p in ("", "/", "/index.html"):
         return 200, FRONTEND_HTML.encode("utf-8"), "text/html; charset=utf-8"
 
     # GET /api/records
