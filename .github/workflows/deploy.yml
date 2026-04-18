@@ -57,10 +57,10 @@ jobs:
             # 部署新代码
             echo "部署新文件..."
             mkdir -p "$DEPLOY_PATH"
-            rsync -a --exclude='.git' --exclude='.github' \
-                   --exclude='node_modules' --exclude='__pycache__' \
-                   --exclude='*.log' \
-                   /github/workspace/ "$DEPLOY_PATH/"
+            # 复制时排除 .git 和大文件
+            cp -r /github/workspace/. "$DEPLOY_PATH/"
+            # 清理不需要的目录
+            rm -rf "$DEPLOY_PATH/.git" "$DEPLOY_PATH/.github" 2>/dev/null || true
 
             # 启动新服务
             echo "启动 Python API..."
