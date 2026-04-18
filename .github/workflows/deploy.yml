@@ -36,16 +36,22 @@ jobs:
             echo "=== $(date) 开始部署 ==="
             echo "目标: $DEPLOY_PATH"
 
-            # 停止旧进程（只杀 python3 进程，绝不杀 SSH 会话）
+            # 停止旧进程（通过 PID 文件精准杀进程）
             echo "停止旧进程..."
-            pkill -f "python3.*server/index.py" 2>/dev/null || true
-            sleep 2
-            # 确认已停止
-            STILL_RUNNING=$(pgrep -f "python3.*server/index.py" 2>/dev/null || true)
-            if [ -n "$STILL_RUNNING" ]; then
-              echo "强制停止残留进程..."
-              pkill -9 -f "python3.*server/index.py" 2>/dev/null || true
-              sleep 1
+            if [ -f "$DEPLOY_PATH/server/api.pid" ]; then
+              OLD_PID=$(cat "$DEPLOY_PATH/server/api.pid")
+              echo "旧进程 PID=$OLD_PID"
+              # 验证确实是 python3 进程再杀
+              if [ -n "$OLD_PID" ] && grep -q "python3" /proc/$OLD_PID/cmdline 2>/dev/null; then
+                kill $OLD_PID 2>/dev/null || true
+                sleep 1
+                kill -9 $OLD_PID 2>/dev/null || true
+                echo "旧进程已停止"
+              else
+                echo "PID 文件无效，跳过"
+              fi
+            else
+              echo "无运行中进程"
             fi
 
             # 部署新代码
@@ -56,10 +62,12 @@ jobs:
                    --exclude='*.log' \
                    /github/workspace/ "$DEPLOY_PATH/"
 
-            # 启动服务
+            # 启动新服务
             echo "启动 Python API..."
             cd "$DEPLOY_PATH/server"
-            nohup python3 index.py >> "$DEPLOY_PATH/api.log" 2>&1 &
+            nohup python3 index.py > "$DEPLOY_PATH/api.log" 2>&1 &
+            echo $! > api.pid
+            echo "新进程 PID=$(cat api.pid)"
             sleep 3
 
             # 验证
@@ -68,7 +76,7 @@ jobs:
               echo "🌐 API: http://localhost:$API_PORT"
             else
               echo "❌ 启动失败，日志:"
-              tail -20 "$DEPLOY_PATH/api.log"
+              cat "$DEPLOY_PATH/api.log"
               exit 1
             fi
             echo "=== 部署完成 ==="
