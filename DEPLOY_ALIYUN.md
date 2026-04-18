@@ -1,110 +1,117 @@
-# 阿里云部署指南（无需信用卡）
+# 阿里云部署指南
 
-## 方案一：阿里云 ECS 云服务器（推荐，有免费试用）
+## 方案一：GitOps 自动部署（推荐，一劳永逸 ✅）
 
-### 1. 领取免费试用
-- 登录 [阿里云免费试用](https://free.aliyun.com/)
-- 领取 **ECS 云服务器（轻量应用服务器）** 1~3 个月免费
-- 或购买 **轻量应用服务器**（最便宜约 ¥24/月，带宽 1Mbps）
+> 代码推送到 GitHub → 自动触发部署到阿里云服务器
 
-### 2. 连接服务器
+### 第一步：服务器准备工作（只需做一次）
+
+用任意 SSH 客户端连接服务器，执行：
+
 ```bash
-ssh root@你的服务器IP
+# 创建工作目录
+mkdir -p /root/pomacea-reporter
+
+# 给部署脚本加执行权限
+chmod +x /root/pomacea-reporter/server/deploy.sh
 ```
 
-### 3. 上传代码（约 1 分钟）
-在本地执行（先把 `server-deploy.tar.gz` 下载到电脑）：
+### 第二步：生成部署密钥（只需做一次）
+
+在**本地电脑**（不是服务器）打开终端：
+
+```bash
+# 生成密钥对（不回车密码，一路回车）
+ssh-keygen -t ed25519 -C "github-deploy" -f github_deploy_key
+
+# 查看公钥
+cat github_deploy_key.pub
+```
+
+复制公钥内容，加入服务器 `authorized_keys`：
+```bash
+# SSH 登录服务器后执行
+echo "刚才复制的公钥内容" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+### 第三步：在 GitHub 配置密钥（只需做一次）
+
+1. 打开仓库：https://github.com/konghaojie-k2/pomacea-reporter/settings/secrets/actions
+2. 点 **New repository secret**，添加以下 4 条：
+
+| Secret 名称 | 值 | 说明 |
+|------------|---|------|
+| `SERVER_HOST` | 你的服务器公网 IP | 例：`47.92..xxx.xxx` |
+| `SERVER_PORT` | `22` | SSH 端口，默认 22 |
+| `SERVER_USER` | `root` | 用户名 |
+| `SERVER_SSH_KEY` | `github_deploy_key` 的**私钥**内容 | 完整粘贴（包括 `-----BEGIN` 和 `-----END` 行） |
+
+3. 点 **Add secret**
+
+### 第四步：在服务器开放 SSH 密钥登录
+
+在服务器执行：
+```bash
+# 编辑 SSH 配置禁用密码登录（更安全）
+sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+systemctl restart sshd
+```
+
+### 第五步：验证自动部署
+
+推送任意改动到 GitHub：
+```bash
+git add .
+git commit -m "test: 验证自动部署"
+git push origin master
+```
+
+打开 https://github.com/konghaojie-k2/pomacea-reporter/actions 查看部署状态。
+
+---
+
+## 方案二：手动部署（一次性使用）
+
+### 1. 上传代码到服务器
+
+在你电脑上下载 `server-deploy.tar.gz` 后：
 ```bash
 scp server-deploy.tar.gz root@你的IP:/root/
 ```
 
-### 4. 解压运行（服务器上执行）
+### 2. 服务器上解压运行
 ```bash
-# 解压
-cd /root
+ssh root@你的IP
+# 输入密码登录后：
+
 tar -xzf server-deploy.tar.gz
-
-# 运行（后台启动，端口 9000）
-nohup python3 /root/server/index.py > api.log 2>&1 &
-
-# 验证是否启动成功
-curl http://localhost:9000/
-# 返回 {"status": "ok", "service": "pomacea-reporter"...} 即成功
+cd server
+chmod +x deploy.sh
+bash deploy.sh
 ```
 
-### 5. 配置防火墙
-在阿里云控制台 → **安全组** → 添加规则：
-- 端口：9000
-- 协议：TCP
-- 来源：0.0.0.0/0
-
-### 6. 获取公网地址
-```
-http://你的服务器IP:9000/api
-```
+### 3. 开放端口
+在阿里云控制台 → **轻量应用服务器** → **防火墙**：
+- 放行端口：**9000**（TCP）
 
 ---
 
-## 方案二：阿里云函数计算（完全免费，需免费试用额度）
-
-### 1. 修改代码适配 HTTP 触发器
-
-`index.py` 已适配函数计算入口，只需做以下处理：
-
-**方式 A：直接用 HTTP 触发器**
-- 在阿里云控制台创建函数
-- 运行时选 **Python 3.9**
-- 代码粘贴 `index.py` 的内容
-- 配置环境变量 `FC_FUNCTION_INPUT_TYPE=http`
-- 创建 HTTP 触发器，拿到公网 URL
-
-**方式 B：容器镜像（推荐）**
-```bash
-# 本地构建镜像（如果有 Docker）
-docker build -t pomacea-api -f Dockerfile .
-docker tag pomacea-api registry.cn-hangzhou.aliyuncs.com/你的命名空间/pomacea-api:v1
-docker push registry.cn-hangzhou.aliyuncs.com/你的命名空间/pomacea-api:v1
-```
-然后在函数计算控制台选择容器镜像部署。
-
----
-
-## 方案三：Nginx 反向代理（推荐已有域名者）
-
-如果你有域名和阿里云 CDN：
-```
-用户请求 → 你的域名:80 → Nginx → Python 后端 :9000
-```
-
-Nginx 配置：
-```nginx
-server {
-    listen 80;
-    server_name api.你的域名.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:9000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
----
-
-## 更新 SKILL.md 和前端
-
-拿到 API URL 后（一站式部署完成后）：
+## 验证部署成功
 
 ```bash
-# 替换 API 地址
-sed -i 's|https://你的API地址|https://实际地址|g' SKILL.md
-sed -i 's|https://你的API地址|https://实际地址|g' web/index.html
-git add . && git commit -m "chore: 更新 API 地址" && git push
+curl https://你的服务器IP:9000/
+# 应返回：{"status":"ok","service":"pomacea-reporter"...}
 ```
 
----
+## 常见问题
 
-## 一句话总结
+**Q: 部署时报 `Permission denied (publickey)`？**
+→ 服务器未正确添加公钥，重新检查第二步
 
-> 最简部署：**买台 ¥24/月的阿里云轻量服务器 → 上传 index.py → `python3 index.py &` → 完成**
+**Q: 部署成功但 API 无法访问？**
+→ 阿里云安全组未开放 9000 端口，在控制台添加入站规则
+
+**Q: 进程启动后又退出了？**
+→ 查看日志：`tail -20 /root/pomacea-reporter/api.log`

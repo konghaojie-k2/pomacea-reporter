@@ -1,0 +1,89 @@
+name: 🚀 自动部署到服务器
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:   # 支持手动触发
+
+env:
+  SERVER_HOST: ${{ secrets.SERVER_HOST }}
+  SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
+  SERVER_USER: ${{ secrets.SERVER_USER || 'root' }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/root/pomacea-reporter' }}
+  API_PORT: ${{ secrets.API_PORT || '9000' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 克隆最新代码
+        uses: actions/checkout@v4
+
+      # ── 打包 server 代码 ─────────────────────────────────
+      - name: 📦 打包 server
+        run: |
+          tar -czf server-deploy.tar.gz server/
+          echo "打包完成: $(du -sh server-deploy.tar.gz | cut -f1)"
+
+      # ── 部署到服务器 ───────────────────────────────────
+      - name: 🚀 通过 SSH 部署到阿里云
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          username: ${{ secrets.SERVER_USER || 'root' }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE || '' }}
+          script: |
+            set -e
+            echo "=== $(date) 开始部署 ==="
+
+            # 创建目录
+            mkdir -p $DEPLOY_PATH
+
+            # 复制新代码
+            cp -r . $DEPLOY_PATH/
+            cd $DEPLOY_PATH
+
+            # 解压
+            tar -xzf server-deploy.tar.gz
+
+            # 停止旧进程
+            OLD_PID=$(pgrep -f "python3.*server/index.py" || true)
+            if [ -n "$OLD_PID" ]; then
+              echo "停止旧进程 PID=$OLD_PID"
+              kill $OLD_PID || true
+              sleep 2
+              kill -9 $OLD_PID 2>/dev/null || true
+            fi
+
+            # 启动新进程
+            cd $DEPLOY_PATH/server
+            nohup python3 index.py >> $DEPLOY_PATH/api.log 2>&1 &
+            sleep 2
+
+            # 验证
+            if curl -sf http://localhost:$API_PORT/ > /dev/null; then
+              echo "✅ 部署成功！服务运行在 http://$SERVER_HOST:$API_PORT"
+            else
+              echo "❌ 部署失败，请检查日志：$DEPLOY_PATH/api.log"
+              tail -20 $DEPLOY_PATH/api.log
+              exit 1
+            fi
+
+            # 清理旧文件
+            rm -f $DEPLOY_PATH/server-deploy.tar.gz
+            echo "=== 部署完成 ==="
+
+      - name: 📊 更新 SKILL.md API 地址
+        if: env.SERVER_HOST != ''
+        run: |
+          echo "当前 API 地址将更新为: https://$SERVER_HOST:${{ secrets.API_PORT || '9000' }}/api"
+          echo "请在 GitHub Secrets 中设置 SERVER_HOST 为你的服务器公网 IP"
+
+      - name: 📝 通知完成
+        run: |
+          echo "🎉 自动部署完成！"
+          echo "API 地址: https://${{ secrets.SERVER_HOST }}:${{ secrets.API_PORT || '9000' }}/api"
