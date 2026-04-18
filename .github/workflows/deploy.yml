@@ -1,4 +1,4 @@
-name: 🚀 自动部署到服务器
+name: 🚀 部署到服务器
 
 on:
   push:
@@ -11,56 +11,47 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: 🚀 通过 SSH 直接在服务器上 git clone 部署
+      - name: 📥 克隆最新代码
+        uses: actions/checkout@v4
+
+      - name: 🚀 通过 SSH 部署（Docker Compose）
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          command_timeout: 5m
-          timeout: 5m
-          command: |
+          script_stop: true
+          command_timeout: 8m
+          timeout: 8m
+          script: |
             set -e
-            DEPLOY_PATH="/home/$USERNAME/pomacea-reporter"
-            API_PORT="9000"
-            REPO_URL="https://github.com/konghaojie-k2/pomacea-reporter.git"
             echo "=== $(date) 开始部署 ==="
+            cd $DEPLOY_PATH
 
-            # 停止旧进程
-            echo "停止旧进程..."
-            if [ -f "$DEPLOY_PATH/server/api.pid" ]; then
-              OLD_PID=$(cat "$DEPLOY_PATH/server/api.pid")
-              [ -n "$OLD_PID" ] && kill $OLD_PID 2>/dev/null || true
-              sleep 1
-            fi
+            # 拉取最新代码
+            git pull origin master
 
-            # 直接从 GitHub clone 最新代码
-            echo "从 GitHub 拉取最新代码..."
-            if [ -d "$DEPLOY_PATH/.git" ]; then
-              cd "$DEPLOY_PATH"
-              git fetch origin master
-              git reset --hard origin/master
-              echo "代码更新完成"
-            else
-              echo "首次部署，执行 clone..."
-              git clone "$REPO_URL" "$DEPLOY_PATH"
-            fi
+            # 停止旧容器，删除旧镜像
+            docker compose down --rmi local 2>/dev/null || true
 
-            # 启动服务
-            echo "启动 Python API..."
-            cd "$DEPLOY_PATH/server"
-            nohup python3 index.py >> "$DEPLOY_PATH/api.log" 2>&1 &
-            echo $! > api.pid
-            echo "进程 PID=$(cat api.pid)"
-            sleep 3
+            # 构建并启动新容器
+            docker compose up -d --build
+
+            # 等待启动
+            sleep 5
 
             # 验证
-            if curl -sf http://localhost:$API_PORT/ > /dev/null 2>&1; then
-              echo "✅ 部署成功！API: http://localhost:$API_PORT"
+            if curl -sf http://localhost:9000/api/records > /dev/null 2>&1; then
+              echo "✅ 部署成功！"
+              echo "🌐 http://\$SERVER_HOST:9000"
             else
-              echo "❌ 启动失败，日志:"
-              tail -20 "$DEPLOY_PATH/api.log"
+              echo "❌ 启动失败，容器日志:"
+              docker compose logs --tail=20
               exit 1
             fi
             echo "=== 部署完成 ==="
+
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/admin/pomacea-reporter' }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
