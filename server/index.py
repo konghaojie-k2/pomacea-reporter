@@ -69,7 +69,7 @@ def handle(req, path, body=b""):
         for r in _load():
             if r.get("id") == record_id:
                 return _json(r)
-        return 404, b'{"error":"记录不存在"}', "application/json"
+        return 404, '{"error":"记录不存在"}', "application/json"
 
     # PATCH /api/records/:id  或  POST /api/records/:id (_method=PATCH)
     if p.startswith("/api/records/") and req in ("PATCH", "POST"):
@@ -90,7 +90,7 @@ def handle(req, path, body=b""):
         before = len(records)
         records = [r for r in records if r.get("id") != record_id]
         if len(records) == before:
-            return 404, b'{"error":"记录不存在"}', "application/json"
+            return 404, '{"error":"记录不存在"}', "application/json"
         _save(records)
         return _json({"success": True, "deleted": record_id})
 
@@ -158,7 +158,7 @@ def handle_update(record_id, body):
             r["handleTime"] = _now()
             _save(records)
             return _json(r)
-    return 404, b'{"error":"记录不存在"}', "application/json"
+    return 404, '{"error":"记录不存在"}', "application/json"
 
 
 # ─── HTTP 服务 ───────────────────────────────────────
