@@ -11,10 +11,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: 📥 克隆最新代码
-        uses: actions/checkout@v4
-
-      - name: 🚀 通过 SSH 部署到阿里云
+      - name: 🚀 通过 SSH 直接在服务器上 git clone 部署
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -23,60 +20,47 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           command_timeout: 5m
           timeout: 5m
-          tar_skip: |
-            .git
-            .github
-            node_modules
-            __pycache__
-            *.log
-          script: |
+          command: |
             set -e
-            DEPLOY_PATH="$HOME/pomacea-reporter"
+            DEPLOY_PATH="/home/$USERNAME/pomacea-reporter"
             API_PORT="9000"
+            REPO_URL="https://github.com/konghaojie-k2/pomacea-reporter.git"
             echo "=== $(date) 开始部署 ==="
-            echo "目标: $DEPLOY_PATH"
 
-            # 停止旧进程（通过 PID 文件精准杀进程）
+            # 停止旧进程
             echo "停止旧进程..."
             if [ -f "$DEPLOY_PATH/server/api.pid" ]; then
               OLD_PID=$(cat "$DEPLOY_PATH/server/api.pid")
-              echo "旧进程 PID=$OLD_PID"
-              # 验证确实是 python3 进程再杀
-              if [ -n "$OLD_PID" ] && grep -q "python3" /proc/$OLD_PID/cmdline 2>/dev/null; then
-                kill $OLD_PID 2>/dev/null || true
-                sleep 1
-                kill -9 $OLD_PID 2>/dev/null || true
-                echo "旧进程已停止"
-              else
-                echo "PID 文件无效，跳过"
-              fi
-            else
-              echo "无运行中进程"
+              [ -n "$OLD_PID" ] && kill $OLD_PID 2>/dev/null || true
+              sleep 1
             fi
 
-            # 部署新代码
-            echo "部署新文件..."
-            mkdir -p "$DEPLOY_PATH"
-            # 复制时排除 .git 和大文件
-            cp -r /github/workspace/. "$DEPLOY_PATH/"
-            # 清理不需要的目录
-            rm -rf "$DEPLOY_PATH/.git" "$DEPLOY_PATH/.github" 2>/dev/null || true
+            # 直接从 GitHub clone 最新代码
+            echo "从 GitHub 拉取最新代码..."
+            if [ -d "$DEPLOY_PATH/.git" ]; then
+              cd "$DEPLOY_PATH"
+              git fetch origin master
+              git reset --hard origin/master
+              echo "代码更新完成"
+            else
+              echo "首次部署，执行 clone..."
+              git clone "$REPO_URL" "$DEPLOY_PATH"
+            fi
 
-            # 启动新服务
+            # 启动服务
             echo "启动 Python API..."
             cd "$DEPLOY_PATH/server"
-            nohup python3 index.py > "$DEPLOY_PATH/api.log" 2>&1 &
+            nohup python3 index.py >> "$DEPLOY_PATH/api.log" 2>&1 &
             echo $! > api.pid
-            echo "新进程 PID=$(cat api.pid)"
+            echo "进程 PID=$(cat api.pid)"
             sleep 3
 
             # 验证
             if curl -sf http://localhost:$API_PORT/ > /dev/null 2>&1; then
-              echo "✅ 部署成功！"
-              echo "🌐 API: http://localhost:$API_PORT"
+              echo "✅ 部署成功！API: http://localhost:$API_PORT"
             else
               echo "❌ 启动失败，日志:"
-              cat "$DEPLOY_PATH/api.log"
+              tail -20 "$DEPLOY_PATH/api.log"
               exit 1
             fi
             echo "=== 部署完成 ==="
