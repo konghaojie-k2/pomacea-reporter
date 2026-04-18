@@ -37,7 +37,7 @@ jobs:
             echo "目标路径: $DEPLOY_PATH"
 
             mkdir -p $DEPLOY_PATH
-            cp -r . $DEPLOY_PATH/
+            cp -r server/ server-deploy.tar.gz $DEPLOY_PATH/
             cd $DEPLOY_PATH
             tar -xzf server-deploy.tar.gz
 
