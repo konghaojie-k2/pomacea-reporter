@@ -31,10 +31,19 @@ metadata:
 
 ## API 信息
 
+> ⚠️ **后端需单独部署**（免费，推荐 Render）：
+> 1. 登录 [render.com](https://render.com) → GitHub 登录
+> 2. New → Web Service → 选 `konghaojie-k2/pomacea-reporter`
+> 3. Build Command: `pip install -r server/requirements.txt`
+> 4. Start Command: `gunicorn server.main:app --bind 0.0.0.0:$PORT`
+> 5. 部署完成后将下方 `API_BASE` 替换为 `.onrender.com` 地址
+
 | 环境 | 地址 |
 |------|------|
-| **生产** | `https://ew35zvt7xrey.space.minimaxi.com/api` |
-| **本地** | `http://localhost:3001/api` |
+| **生产 API** | `https://你的渲染地址.onrender.com/api`（部署后填入） |
+| **本地开发** | `http://localhost:3001/api` |
+
+**API_BASE 变量名：** 部署后把 `https://xxx.onrender.com/api` 填入 SKILL.md 和 web/index.html 的 API 常量中。
 
 ---
 
