@@ -155,7 +155,7 @@ GET https://restapi.amap.com/v3/geocode/regeo?key={AMAP_KEY}&location={lng},{lat
 ### Step 3 — 调用 API 上报
 
 ```bash
-curl -X POST https://ew35zvt7xrey.space.minimaxi.com/api/records \
+curl -X POST https://47.85.36.226:9000/api/records \
   -H "Content-Type: application/json" \
   -d '{
     "lat": 31.2989,
@@ -179,7 +179,7 @@ curl -X POST https://ew35zvt7xrey.space.minimaxi.com/api/records \
 📷 照片：已保存（如有）
 🗓️ 时间：{createdAt}
 
-🌐 地图查看：https://ew35zvt7xrey.space.minimaxi.com
+🌐 地图查看：https://47.85.36.226:9000
 ```
 
 ### ⚠️ 缺少定位
@@ -216,6 +216,6 @@ curl -X POST https://ew35zvt7xrey.space.minimaxi.com/api/records \
 
 ## 相关资源
 
-- 🗺️ 地图展示：[https://ew35zvt7xrey.space.minimaxi.com](https://ew35zvt7xrey.space.minimaxi.com)
+- 🗺️ 地图展示：[https://47.85.36.226:9000](https://47.85.36.226:9000)
 - 📦 前端源码：[https://github.com/konghaojie-k2/pomacea-tracker](https://github.com/konghaojie-k2/pomacea-tracker)
 - 🐛 问题反馈：[GitHub Issues](https://github.com/konghaojie-k2/pomacea-reporter/issues)
