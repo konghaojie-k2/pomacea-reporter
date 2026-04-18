@@ -14,11 +14,6 @@ jobs:
       - name: 📥 克隆最新代码
         uses: actions/checkout@v4
 
-      - name: 📦 打包 server
-        run: |
-          tar -czf server-deploy.tar.gz server/
-          echo "打包完成: $(du -sh server-deploy.tar.gz | cut -f1)"
-
       - name: 🚀 通过 SSH 部署到阿里云
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -26,15 +21,20 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script_stop: true
           command_timeout: 5m
           timeout: 5m
+          tar_skip: |
+            .git
+            .github
+            node_modules
+            __pycache__
+            *.log
           script: |
             set -e
-            DEPLOY_PATH="/home/$USERNAME/pomacea-reporter"
+            DEPLOY_PATH="$HOME/pomacea-reporter"
             API_PORT="9000"
             echo "=== $(date) 开始部署 ==="
-            echo "目标路径: $DEPLOY_PATH"
+            echo "目标: $DEPLOY_PATH"
 
             # 停止旧进程
             OLD_PID=$(pgrep -f "python3.*server/index.py" 2>/dev/null || true)
@@ -45,53 +45,25 @@ jobs:
               kill -9 $OLD_PID 2>/dev/null || true
             fi
 
-            # 备份旧日志（如有）
-            if [ -f "$DEPLOY_PATH/api.log" ]; then
-              mv "$DEPLOY_PATH/api.log" "$DEPLOY_PATH/api.log.bak"
-            fi
-
-            # 创建临时目录
-            TMP_DIR=$(mktemp -d)
-            echo "临时目录: $TMP_DIR"
-
-            # 将打包文件传到服务器临时目录
-            echo "$DEPLOY_PATH" > /tmp/deploy_path.txt
-
-            # 在服务器上解压并安装
-            echo "解压并启动..."
-            cd "$TMP_DIR"
-            tar -xzf /tmp/server-deploy.tar.gz 2>/dev/null || tar -xzf server-deploy.tar.gz
+            # 部署新代码（跳过 .git 等目录）
+            echo "部署新文件..."
+            mkdir -p "$DEPLOY_PATH"
+            rsync -a --exclude='.git' --exclude='.github' \
+                   --exclude='node_modules' --exclude='__pycache__' \
+                   /github/workspace/ "$DEPLOY_PATH/"
 
             # 启动服务
-            echo "启动 Python API 服务..."
-            nohup python3 index.py > /tmp/api_startup.log 2>&1 &
+            echo "启动 Python API..."
+            cd "$DEPLOY_PATH/server"
+            nohup python3 index.py >> "$DEPLOY_PATH/api.log" 2>&1 &
             sleep 3
 
-            # 验证服务
+            # 验证
             if curl -sf http://localhost:$API_PORT/ > /dev/null 2>&1; then
-              echo "✅ 部署成功！"
-              echo "🌐 API: http://localhost:$API_PORT"
+              echo "✅ 部署成功！API 运行在 http://localhost:$API_PORT"
             else
-              echo "❌ 启动失败，日志:"
-              cat /tmp/api_startup.log
+              echo "❌ 启动失败，查看日志:"
+              tail -20 "$DEPLOY_PATH/api.log"
               exit 1
             fi
-
-            # 清理临时目录
-            rm -rf "$TMP_DIR"
             echo "=== 部署完成 ==="
-
-      - name: ✅ 部署成功
-        if: success()
-        run: |
-          echo "🎉 部署完成！"
-          echo "🌐 API: https://${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_PORT }}/api"
-
-      - name: ❌ 部署失败
-        if: failure()
-        run: |
-          echo "❌ 部署失败"
-          echo "常见原因："
-          echo "1. 阿里云安全组未开放 SSH (22) 端口"
-          echo "2. 服务器 Python 版本过低（需要 Python 3）"
-          echo "3. 端口 9000 被占用"
