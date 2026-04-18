@@ -3,21 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🐌 福寿螺分布地图 | Pomacea Map</title>
+  <title>🐌 福寿螺分布地图 | 举报 &amp; 处理平台</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --green: #2d7a4f;
-      --green-light: #e8f5ee;
-      --green-dark: #1a5435;
-      --amber: #d97706;
-      --amber-light: #fffbeb;
-      --gray-50: #f9fafb;
-      --gray-200: #e5e7eb;
-      --gray-500: #6b7280;
-      --gray-900: #111827;
-      --red: #dc2626;
+      --green: #2d7a4f; --green-light: #e8f5ee; --green-dark: #1a5435;
+      --amber: #d97706; --amber-light: #fffbeb;
+      --red: #dc2626; --red-light: #fef2f2;
+      --blue: #2563eb; --blue-light: #eff6ff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Noto Sans SC', sans-serif; color: var(--gray-900); background: var(--gray-50); }
@@ -25,257 +21,627 @@
     /* Header */
     header {
       background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
-      color: white;
-      padding: 1.5rem 2rem;
-      position: sticky; top: 0; z-index: 1000;
+      color: white; position: sticky; top: 0; z-index: 1000;
       box-shadow: 0 2px 12px rgba(0,0,0,0.15);
     }
-    header .inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .header-inner {
+      max-width: 1400px; margin: 0 auto; padding: 1rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    }
     .brand { display: flex; align-items: center; gap: 0.75rem; }
     .brand-icon { font-size: 2rem; }
-    .brand h1 { font-size: 1.4rem; font-weight: 700; }
-    .brand span { opacity: 0.85; font-size: 0.875rem; }
-    .stats { display: flex; gap: 1.5rem; }
-    .stat { text-align: center; }
-    .stat strong { font-size: 1.5rem; display: block; }
-    .stat small { opacity: 0.8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .brand h1 { font-size: 1.3rem; font-weight: 700; }
+    .brand span { opacity: 0.85; font-size: 0.8rem; }
+    .header-stats { display: flex; gap: 1.5rem; }
+    .hstat { text-align: center; }
+    .hstat strong { font-size: 1.4rem; display: block; }
+    .hstat small { opacity: 0.8; font-size: 0.7rem; text-transform: uppercase; }
 
-    /* Hero alert */
-    .hero-alert {
-      background: var(--amber-light);
-      border-left: 4px solid var(--amber);
-      padding: 0.75rem 1.5rem;
-      font-size: 0.875rem;
-      color: #92400e;
+    /* Alert bar */
+    .alert-bar {
+      background: var(--amber-light); border-left: 4px solid var(--amber);
+      padding: 0.6rem 1.5rem; font-size: 0.85rem; color: #92400e;
       display: flex; align-items: center; gap: 0.5rem;
     }
 
+    /* Tab nav */
+    .tab-nav {
+      background: white; border-bottom: 2px solid var(--gray-200);
+      display: flex; gap: 0; max-width: 1400px; margin: 0 auto; padding: 0 1.5rem;
+    }
+    .tab-btn {
+      padding: 0.75rem 1.25rem; border: none; background: none; cursor: pointer;
+      font-size: 0.875rem; font-weight: 600; color: var(--gray-500);
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      transition: all 0.2s; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+    .tab-btn .badge {
+      background: var(--gray-200); color: var(--gray-700);
+      font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 20px;
+    }
+    .tab-btn.active .badge { background: var(--green-light); color: var(--green); }
+
     /* Layout */
-    .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 120px); }
-    @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    .main-layout { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 140px); }
+    @media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
 
     /* Sidebar */
-    .sidebar { background: white; border-right: 1px solid var(--gray-200); overflow-y: auto; padding: 1rem; }
-    .panel { background: var(--green-light); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
-    .panel h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 0.5rem; }
-    .form-group { margin-bottom: 0.75rem; }
-    .form-group label { display: block; font-size: 0.8rem; color: var(--gray-500); margin-bottom: 0.25rem; }
-    .form-group input, .form-group textarea {
-      width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--gray-200);
-      border-radius: 8px; font-size: 0.875rem; font-family: inherit;
-      transition: border-color 0.2s;
+    .sidebar { background: white; border-right: 1px solid var(--gray-200); overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .panel { background: var(--gray-50); border-radius: 12px; padding: 0.9rem; }
+    .panel-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 0.6rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem; }
+
+    /* Form */
+    .form-group { margin-bottom: 0.6rem; }
+    .form-group label { display: block; font-size: 0.75rem; color: var(--gray-500); margin-bottom: 0.2rem; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 0.5rem 0.6rem; border: 1px solid var(--gray-200);
+      border-radius: 8px; font-size: 0.85rem; font-family: inherit;
+      transition: border-color 0.2s; background: white;
     }
-    .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--green); }
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-      width: 100%; padding: 0.65rem 1rem; border: none; border-radius: 8px;
-      font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+      outline: none; border-color: var(--green);
     }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 0.35rem; width: 100%; padding: 0.6rem 1rem; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .btn-primary { background: var(--green); color: white; }
     .btn-primary:hover { background: var(--green-dark); transform: translateY(-1px); }
-    .btn-outline { background: transparent; border: 2px solid var(--green); color: var(--green); }
-    .btn-outline:hover { background: var(--green-light); }
+    .btn-secondary { background: white; border: 2px solid var(--green); color: var(--green); }
+    .btn-secondary:hover { background: var(--green-light); }
+    .btn-amber { background: var(--amber); color: white; }
+    .btn-amber:hover { background: #b45309; }
+    .btn-blue { background: var(--blue); color: white; }
+    .btn-blue:hover { background: #1d4ed8; }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.75rem; width: auto; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .form-msg { margin-top: 0.4rem; font-size: 0.8rem; text-align: center; padding: 0.3rem; border-radius: 6px; }
+    .form-msg.ok { color: var(--green); background: var(--green-light); }
+    .form-msg.err { color: var(--red); background: var(--red-light); }
 
-    .record-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    /* Record list */
+    .record-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 400px; overflow-y: auto; }
     .record-card {
-      background: white; border: 1px solid var(--gray-200); border-radius: 10px;
-      padding: 0.75rem; cursor: pointer; transition: all 0.2s;
+      background: white; border: 1.5px solid var(--gray-200); border-radius: 10px;
+      padding: 0.7rem; cursor: pointer; transition: all 0.2s; position: relative;
     }
-    .record-card:hover { border-color: var(--green); box-shadow: 0 2px 8px rgba(45,122,79,0.12); }
-    .record-card .rc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
-    .record-card .rc-note { font-size: 0.8rem; color: var(--gray-500); }
-    .record-card .rc-time { font-size: 0.7rem; color: var(--gray-500); }
-    .record-badge { background: var(--red); color: white; font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 20px; }
+    .record-card:hover { border-color: var(--green); box-shadow: 0 2px 8px rgba(45,122,79,0.1); }
+    .record-card.active { border-color: var(--green); background: var(--green-light); }
+    .rc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+    .rc-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+    .badge-p { background: var(--amber-light); color: var(--amber); font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 20px; font-weight: 600; }
+    .badge-r { background: var(--green-light); color: var(--green); font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 20px; font-weight: 600; }
+    .badge-x { background: var(--blue-light); color: var(--blue); font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 20px; font-weight: 600; }
+    .badge-time { font-size: 0.68rem; color: var(--gray-500); }
+    .rc-note { font-size: 0.8rem; color: var(--gray-700); line-height: 1.4; margin-bottom: 0.2rem; }
+    .rc-addr { font-size: 0.72rem; color: var(--gray-500); }
+    .rc-feedback { font-size: 0.72rem; color: var(--green); margin-top: 0.3rem; background: var(--green-light); padding: 0.25rem 0.5rem; border-radius: 6px; }
+    .rc-handler { font-size: 0.68rem; color: var(--gray-500); margin-top: 0.2rem; }
 
     /* Map */
     #map { width: 100%; height: 100%; }
+
+    /* Leaflet popup */
     .leaflet-popup-content-wrapper { border-radius: 12px; }
-    .popup-content { min-width: 180px; }
+    .popup-content { min-width: 200px; }
     .popup-content h4 { margin-bottom: 0.4rem; color: var(--green); font-size: 0.9rem; }
-    .popup-content p { font-size: 0.78rem; color: var(--gray-500); margin-bottom: 0.25rem; }
+    .popup-content p { font-size: 0.78rem; color: var(--gray-700); margin-bottom: 0.25rem; }
+    .popup-content .popup-status { display: inline-block; margin: 0.2rem 0; padding: 0.1rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
     .popup-content small { font-size: 0.7rem; color: var(--gray-500); }
+
+    /* Handle panel (shown when record selected in handler view) */
+    .handle-panel { display: none; }
+    .handle-panel.visible { display: block; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 2000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal { background: white; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal h3 { font-size: 1rem; margin-bottom: 1rem; color: var(--gray-900); display: flex; align-items: center; gap: 0.5rem; }
+    .modal-footer { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    .modal-footer .btn { flex: 1; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 2rem 1rem; color: var(--gray-500); font-size: 0.85rem; }
+    .empty-state .emoji { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
   </style>
 </head>
 <body>
 
+<!-- Header -->
 <header>
-  <div class="inner">
+  <div class="header-inner">
     <div class="brand">
       <span class="brand-icon">🐌</span>
       <div>
-        <h1>福寿螺分布地图</h1>
-        <span>实时举报 · 协同守护生态</span>
+        <h1>福寿螺举报 &amp; 处理平台</h1>
+        <span>公众举报 · 政府处理 · 协同守护生态</span>
       </div>
     </div>
-    <div class="stats">
-      <div class="stat"><strong id="count-total">--</strong><small>举报总数</small></div>
-      <div class="stat"><strong id="count-today">--</strong><small>今日新增</small></div>
+    <div class="header-stats">
+      <div class="hstat"><strong id="stat-total">--</strong><small>总举报</small></div>
+      <div class="hstat"><strong id="stat-pending">--</strong><small>待处理</small></div>
+      <div class="hstat"><strong id="stat-processing">--</strong><small>处理中</small></div>
+      <div class="hstat"><strong id="stat-resolved">--</strong><small>已处理</small></div>
+      <div class="hstat"><strong id="stat-rate">--</strong><small>处理率%</small></div>
     </div>
   </div>
 </header>
 
-<div class="hero-alert">
-  ⚠️ 福寿螺是全球100种最具破坏力入侵物种之一，发现请立即上报！
+<!-- Alert bar -->
+<div class="alert-bar">
+  ⚠️ 福寿螺是全球100种最具破坏力入侵物种之一，发现请立即上报！举报人可实时收到处理反馈通知。
 </div>
 
-<div class="layout">
+<!-- Tab nav -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('report')" id="tab-report">
+    📍 我要举报 <span class="badge" id="badge-report">入口</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('handler')" id="tab-handler">
+    🏛️ 处理中心 <span class="badge" id="badge-handler">0</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('all')" id="tab-all">
+    🗺️ 全部地图 <span class="badge" id="badge-all">--</span>
+  </button>
+</nav>
+
+<!-- Main layout -->
+<div class="main-layout">
+
+  <!-- ── LEFT SIDEBAR ── -->
   <div class="sidebar">
-    <!-- 上报表单 -->
-    <div class="panel">
-      <h3>📍 上报新发现</h3>
-      <div class="form-group">
-        <label>纬度</label>
-        <input type="number" id="f-lat" step="0.0001" placeholder="例：31.2989" />
+
+    <!-- ── TAB: 举报 ── -->
+    <div id="panel-report">
+      <div class="panel">
+        <div class="panel-title">📍 上报新发现</div>
+        <div class="form-group"><label>纬度</label>
+          <input type="number" id="r-lat" step="0.0001" placeholder="例：31.2989" />
+        </div>
+        <div class="form-group"><label>经度</label>
+          <input type="number" id="r-lng" step="0.0001" placeholder="例：120.6853" />
+        </div>
+        <div class="form-group"><label>描述 *</label>
+          <textarea id="r-note" rows="2" placeholder="描述发现地点、环境…"></textarea>
+        </div>
+        <div class="form-group"><label>地址（可选）</label>
+          <input type="text" id="r-addr" placeholder="例：苏州金鸡湖" />
+        </div>
+        <button class="btn btn-primary" onclick="submitRecord()">🐌 提交举报</button>
+        <div id="r-msg" class="form-msg"></div>
       </div>
-      <div class="form-group">
-        <label>经度</label>
-        <input type="number" id="f-lng" step="0.0001" placeholder="例：120.6853" />
+
+      <div class="panel">
+        <div class="panel-title">💡 使用说明</div>
+        <div style="font-size:0.78rem;color:var(--gray-500);line-height:1.6;">
+          <p>① 拍摄福寿螺或卵的照片</p>
+          <p>② 选中地图上的位置（或手动输入坐标）</p>
+          <p>③ 填写描述并提交</p>
+          <p>④ 等待处理人员反馈</p>
+          <p style="margin-top:0.4rem;color:var(--green);font-weight:600;">📌 提交后会收到处理通知</p>
+        </div>
       </div>
-      <div class="form-group">
-        <label>描述</label>
-        <textarea id="f-note" rows="2" placeholder="描述发现地点或环境..."></textarea>
-      </div>
-      <div class="form-group">
-        <label>地址（可选）</label>
-        <input type="text" id="f-addr" placeholder="例：苏州金鸡湖" />
-      </div>
-      <button class="btn btn-primary" onclick="submitRecord()">🐌 上报记录</button>
-      <div id="form-msg" style="margin-top:0.5rem;font-size:0.8rem;text-align:center;"></div>
     </div>
 
-    <!-- 记录列表 -->
-    <div class="panel">
-      <h3>📋 最近记录 (<span id="list-count">0</span>)</h3>
-      <div class="record-list" id="record-list"></div>
+    <!-- ── TAB: 处理中心 ── -->
+    <div id="panel-handler" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">🏛️ 处理操作</div>
+        <div id="handler-selected" style="font-size:0.82rem;color:var(--gray-500);text-align:center;padding:0.5rem;">
+          👈 先在右侧选择一个待处理举报
+        </div>
+        <div id="handler-form" style="display:none;">
+          <div class="form-group">
+            <label>处理人姓名</label>
+            <input type="text" id="h-name" placeholder="例：张三 / 城管局小王" />
+          </div>
+          <div class="form-group">
+            <label>处理状态</label>
+            <select id="h-status">
+              <option value="processing">🔵 处理中</option>
+              <option value="resolved">✅ 已处理</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>处理说明</label>
+            <textarea id="h-feedback" rows="3" placeholder="例：已安排人员现场清理 / 已撒药处理 / 已联系物业"></textarea>
+          </div>
+          <button class="btn btn-amber" onclick="submitHandle()">💾 提交处理结果</button>
+          <div id="h-msg" class="form-msg"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">📋 待处理举报 (<span id="handler-pending-count">0</span>)</div>
+        <div class="record-list" id="handler-pending-list"></div>
+      </div>
+    </div>
+
+    <!-- ── TAB: 全部地图 ── -->
+    <div id="panel-all" style="display:none;">
+      <div class="panel">
+        <div class="panel-title">🔍 筛选</div>
+        <div class="form-group">
+          <select id="f-status" onchange="loadRecords()">
+            <option value="">全部状态</option>
+            <option value="pending">🟡 待处理</option>
+            <option value="processing">🔵 处理中</option>
+            <option value="resolved">✅ 已处理</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📋 全部举报 (<span id="all-count">0</span>)</div>
+        <div class="record-list" id="all-record-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ── MAP ── -->
+  <div id="map"></div>
+
+</div><!-- /main-layout -->
+
+<!-- Handle modal (for map popup) -->
+<div class="modal-overlay" id="handleModal">
+  <div class="modal">
+    <h3>🏛️ 处理举报</h3>
+    <div id="modal-record-info" style="font-size:0.82rem;color:var(--gray-700);margin-bottom:0.8rem;"></div>
+    <div class="form-group">
+      <label>处理人姓名</label>
+      <input type="text" id="m-name" placeholder="例：李四" />
+    </div>
+    <div class="form-group">
+      <label>处理状态</label>
+      <select id="m-status">
+        <option value="processing">🔵 处理中</option>
+        <option value="resolved">✅ 已处理</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>处理说明</label>
+      <textarea id="m-feedback" rows="3" placeholder="简要说明处理措施…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-amber" onclick="submitModalHandle()">💾 确认处理</button>
     </div>
   </div>
-
-  <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+  // ─── Config ────────────────────────────────────────────
   const API = 'https://ew35zvt7xrey.space.minimaxi.com/api';
-  const map = L.map('map').setView([31.0, 120.6], 8);
+  let records = [];
+  let markers = {};
+  let selectedId = null;
+  let currentTab = 'report';
 
+  // ─── Map ─────────────────────────────────────────────
+  const map = L.map('map').setView([31.0, 120.6], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 18,
+    attribution: '© OpenStreetMap', maxZoom: 18,
   }).addTo(map);
 
-  const markers = {};
+  // ─── Status config ────────────────────────────────────
+  const STATUS_CONFIG = {
+    pending:    { label: '待处理', color: '#d97706', bg: '#fffbeb', badge: 'badge-p' },
+    processing: { label: '处理中', color: '#2563eb', bg: '#eff6ff', badge: 'badge-x' },
+    resolved:   { label: '已处理', color: '#2d7a4f', bg: '#e8f5ee', badge: 'badge-r' },
+  };
 
+  // ─── Utils ────────────────────────────────────────────
   function fmtDate(iso) {
+    if (!iso) return '';
     const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  function statusBadge(status) {
+    const c = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+    return `<span style="background:${c.bg};color:${c.color};font-size:0.65rem;padding:0.1rem 0.5rem;border-radius:20px;font-weight:600;">${c.label}</span>`;
   }
 
+  // ─── Render popup ─────────────────────────────────────
   function renderPopup(r) {
+    const c = STATUS_CONFIG[r.status] || STATUS_CONFIG.pending;
+    const feedbackHtml = r.feedback
+      ? `<div style="margin-top:0.4rem;background:${c.bg};padding:0.4rem 0.6rem;border-radius:8px;font-size:0.75rem;color:${c.color};">
+           💬 ${r.feedback}
+           ${r.handler ? `<br><span style="font-size:0.68rem;opacity:0.8;">— ${r.handler} ${r.handleTime ? '@'+fmtDate(r.handleTime) : ''}</span>` : ''}
+         </div>`
+      : '';
     return `<div class="popup-content">
       <h4>🐌 福寿螺发现点</h4>
       <p>${r.note || '无描述'}</p>
       <p>📍 ${r.address || '未知地址'}</p>
-      <small>🗓 ${fmtDate(r.createdAt)}</small>
-      ${r.photo ? `<br><img src="${r.photo}" style="max-width:100%;margin-top:0.4rem;border-radius:6px;" />` : ''}
+      <p>🗓 ${fmtDate(r.createdAt)}</p>
+      <div style="margin:0.3rem 0;">${statusBadge(r.status)}</div>
+      ${feedbackHtml}
+      ${r.status !== 'resolved' ? `<button onclick="openModal('${r.id}')" style="margin-top:0.5rem;background:#d97706;color:white;border:none;border-radius:6px;padding:0.35rem 0.8rem;font-size:0.75rem;cursor:pointer;font-weight:600;">🏛️ 处理</button>` : ''}
     </div>`;
   }
 
   function addMarker(r) {
-    const key = r.id;
-    if (markers[key]) { map.removeLayer(markers[key]); }
-    const m = L.marker([r.lat, r.lng])
-      .bindPopup(renderPopup(r));
-    markers[key] = m;
+    if (markers[r.id]) map.removeLayer(markers[r.id]);
+    const c = STATUS_CONFIG[r.status] || STATUS_CONFIG.pending;
+    const m = L.circleMarker([r.lat, r.lng], {
+      radius: 10, fillColor: c.color, color: 'white', weight: 2,
+      fillOpacity: 0.85,
+    }).bindPopup(renderPopup(r), { maxWidth: 280 });
+    markers[r.id] = m;
     m.addTo(map);
   }
 
+  // ─── Load records ──────────────────────────────────────
   async function loadRecords() {
     try {
-      const res = await fetch(`${API}/records`);
+      const statusFilter = document.getElementById('f-status')?.value || '';
+      let url = `${API}/records`;
+      if (statusFilter) url += `?status=${statusFilter}`;
+      const res = await fetch(url);
       const data = await res.json();
-      const records = data.records || [];
+      records = (data.records || []).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
 
-      document.getElementById('count-total').textContent = records.length;
+      // Update stats
+      const all = records;
+      document.getElementById('stat-total').textContent = all.length;
+      document.getElementById('stat-pending').textContent = all.filter(r=>r.status==='pending').length;
+      document.getElementById('stat-processing').textContent = all.filter(r=>r.status==='processing').length;
+      document.getElementById('stat-resolved').textContent = all.filter(r=>r.status==='resolved').length;
+      const rate = all.length ? Math.round(all.filter(r=>r.status==='resolved').length / all.length * 100) : 0;
+      document.getElementById('stat-rate').textContent = rate + '%';
+      document.getElementById('badge-handler').textContent = all.filter(r=>r.status!=='resolved').length;
+      document.getElementById('badge-all').textContent = all.length;
 
-      const today = new Date().toDateString();
-      const todayCount = records.filter(r => new Date(r.createdAt).toDateString() === today).length;
-      document.getElementById('count-today').textContent = todayCount;
-      document.getElementById('list-count').textContent = records.length;
+      // Render markers
+      records.forEach(addMarker);
 
-      const list = document.getElementById('record-list');
-      list.innerHTML = '';
+      // Render lists per tab
+      renderReportList();
+      renderHandlerList();
+      renderAllList();
 
-      // 按时间倒序
-      const sorted = [...records].reverse().slice(0, 20);
-      sorted.forEach(r => {
-        addMarker(r);
-        const el = document.createElement('div');
-        el.className = 'record-card';
-        el.innerHTML = `
-          <div class="rc-header">
-            <span class="record-badge">🐌</span>
-            <span class="rc-time">${fmtDate(r.createdAt)}</span>
-          </div>
-          <div class="rc-note">${r.address || r.note || '无描述'}</div>
-        `;
-        el.onclick = () => {
-          map.setView([r.lat, r.lng], 14);
-          markers[r.id].openPopup();
-        };
-        list.appendChild(el);
-      });
-    } catch (e) {
-      console.error('加载失败:', e);
-    }
+    } catch(e) { console.error('加载失败', e); }
   }
 
+  // ─── Report list ─────────────────────────────────────
+  function renderReportList() {
+    // Show 10 most recent
+    const list = document.getElementById('all-record-list');
+    if (!list) return;
+    list.innerHTML = records.slice(0, 15).map(r => recordCardHTML(r)).join('');
+  }
+
+  // ─── Handler list (pending + processing) ───────────────
+  function renderHandlerList() {
+    const pending = records.filter(r => r.status !== 'resolved');
+    document.getElementById('handler-pending-count').textContent = pending.length;
+    const el = document.getElementById('handler-pending-list');
+    if (!el) return;
+    if (!pending.length) {
+      el.innerHTML = '<div class="empty-state"><span class="emoji">✅</span>暂无待处理举报</div>';
+      return;
+    }
+    el.innerHTML = pending.map(r => recordCardHTML(r, true)).join('');
+  }
+
+  // ─── All list ─────────────────────────────────────────
+  function renderAllList() {
+    const statusFilter = document.getElementById('f-status')?.value || '';
+    const filtered = statusFilter ? records.filter(r => r.status === statusFilter) : records;
+    document.getElementById('all-count').textContent = filtered.length;
+    const el = document.getElementById('all-record-list');
+    if (!el) return;
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty-state"><span class="emoji">📭</span>暂无举报</div>';
+      return;
+    }
+    el.innerHTML = filtered.map(r => recordCardHTML(r)).join('');
+  }
+
+  function recordCardHTML(r, selectable = false) {
+    const selAttr = selectable ? `onclick="selectRecord('${r.id}')" style="cursor:pointer;"` : `onclick="focusRecord('${r.id}')" style="cursor:pointer;"`;
+    const feedbackHtml = r.feedback
+      ? `<div class="rc-feedback">💬 ${r.feedback}</div>` : '';
+    const handlerHtml = r.handler
+      ? `<div class="rc-handler">🏛️ ${r.handler} · ${fmtDate(r.handleTime)}</div>` : '';
+    return `<div class="record-card" ${selAttr}>
+      <div class="rc-top">
+        <div class="rc-badges">${statusBadge(r.status)}</div>
+        <span class="badge-time">${fmtDate(r.createdAt)}</span>
+      </div>
+      <div class="rc-note">${r.note || '无描述'}</div>
+      <div class="rc-addr">📍 ${r.address || '未知地址'}</div>
+      ${feedbackHtml}
+      ${handlerHtml}
+    </div>`;
+  }
+
+  function focusRecord(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    map.setView([r.lat, r.lng], 15);
+    if (markers[id]) markers[id].openPopup();
+  }
+
+  function selectRecord(id) {
+    selectedId = id;
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    // Highlight card
+    document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    // Show handler form
+    document.getElementById('handler-selected').style.display = 'none';
+    document.getElementById('handler-form').style.display = 'block';
+    document.getElementById('h-name').value = '';
+    document.getElementById('h-status').value = 'processing';
+    document.getElementById('h-feedback').value = '';
+    // Fly to marker
+    map.setView([r.lat, r.lng], 15);
+    if (markers[id]) markers[id].openPopup();
+  }
+
+  // ─── Submit report ────────────────────────────────────
   async function submitRecord() {
-    const lat = parseFloat(document.getElementById('f-lat').value);
-    const lng = parseFloat(document.getElementById('f-lng').value);
-    const note = document.getElementById('f-note').value;
-    const address = document.getElementById('f-addr').value;
-    const msg = document.getElementById('form-msg');
+    const lat = parseFloat(document.getElementById('r-lat').value);
+    const lng = parseFloat(document.getElementById('r-lng').value);
+    const note = document.getElementById('r-note').value.trim();
+    const address = document.getElementById('r-addr').value.trim();
+    const msg = document.getElementById('r-msg');
 
     if (!lat || !lng || !note) {
-      msg.style.color = 'var(--red)';
-      msg.textContent = '⚠️ 请填写纬度、经度和描述';
+      msg.className = 'form-msg err'; msg.textContent = '⚠️ 请填写纬度、经度和描述';
       return;
     }
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      msg.style.color = 'var(--red)';
-      msg.textContent = '⚠️ 坐标超出合法范围';
+      msg.className = 'form-msg err'; msg.textContent = '⚠️ 坐标超出合法范围';
       return;
     }
-
     try {
       const res = await fetch(`${API}/records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat, lng, note, address }),
       });
-      if (!res.ok) throw new Error('提交失败');
+      if (!res.ok) throw new Error(await res.text());
       const r = await res.json();
-
-      msg.style.color = 'var(--green)';
-      msg.textContent = '✅ 上报成功！';
-
-      document.getElementById('f-lat').value = '';
-      document.getElementById('f-lng').value = '';
-      document.getElementById('f-note').value = '';
-      document.getElementById('f-addr').value = '';
-
+      msg.className = 'form-msg ok';
+      msg.textContent = '✅ 举报成功！等待处理人员反馈…';
+      document.getElementById('r-lat').value = '';
+      document.getElementById('r-lng').value = '';
+      document.getElementById('r-note').value = '';
+      document.getElementById('r-addr').value = '';
       addMarker(r);
-      map.setView([r.lat, r.lng], 13);
-      markers[r.id].openPopup();
-
-      loadRecords();
-      setTimeout(() => { msg.textContent = ''; }, 3000);
-    } catch (e) {
-      msg.style.color = 'var(--red)';
-      msg.textContent = '❌ 上报失败，请重试';
+      records.unshift(r);
+      renderReportList();
+      renderHandlerList();
+      renderAllList();
+      map.setView([r.lat, r.lng], 14);
+      setTimeout(() => { msg.textContent = ''; }, 4000);
+    } catch(e) {
+      msg.className = 'form-msg err'; msg.textContent = '❌ 提交失败，请重试';
     }
   }
 
+  // ─── Submit handle ────────────────────────────────────
+  async function submitHandle() {
+    if (!selectedId) return;
+    const handler = document.getElementById('h-name').value.trim();
+    const status = document.getElementById('h-status').value;
+    const feedback = document.getElementById('h-feedback').value.trim();
+    const msg = document.getElementById('h-msg');
+
+    if (!handler) { msg.className = 'form-msg err'; msg.textContent = '⚠️ 请填写处理人姓名'; return; }
+
+    try {
+      const res = await fetch(`${API}/records/${selectedId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, handler, feedback }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const updated = await res.json();
+
+      // Update local state
+      const idx = records.findIndex(r => r.id === selectedId);
+      if (idx !== -1) records[idx] = updated;
+      addMarker(updated);
+
+      msg.className = 'form-msg ok'; msg.textContent = '✅ 处理结果已提交！';
+      document.getElementById('handler-form').style.display = 'none';
+      document.getElementById('handler-selected').style.display = 'block';
+      selectedId = null;
+      renderHandlerList();
+      renderAllList();
+      loadRecords(); // refresh stats
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    } catch(e) {
+      msg.className = 'form-msg err'; msg.textContent = '❌ 提交失败，请重试';
+    }
+  }
+
+  // ─── Modal ────────────────────────────────────────────
+  let modalRecordId = null;
+
+  function openModal(id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+    modalRecordId = id;
+    document.getElementById('modal-record-info').innerHTML =
+      `<div style="background:#f9fafb;padding:0.6rem;border-radius:8px;margin-bottom:0.5rem;">
+        <strong>${r.note || '无描述'}</strong><br/>
+        <span style="font-size:0.75rem;color:#6b7280;">📍 ${r.address || '未知地址'} · ${fmtDate(r.createdAt)}</span>
+      </div>`;
+    document.getElementById('m-name').value = '';
+    document.getElementById('m-status').value = 'resolved';
+    document.getElementById('m-feedback').value = '';
+    document.getElementById('handleModal').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('handleModal').classList.remove('show');
+    modalRecordId = null;
+  }
+
+  async function submitModalHandle() {
+    if (!modalRecordId) return;
+    const handler = document.getElementById('m-name').value.trim();
+    const status = document.getElementById('m-status').value;
+    const feedback = document.getElementById('m-feedback').value.trim();
+    if (!handler) { alert('请填写处理人姓名'); return; }
+    try {
+      const res = await fetch(`${API}/records/${modalRecordId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, handler, feedback }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      const idx = records.findIndex(r => r.id === modalRecordId);
+      if (idx !== -1) records[idx] = updated;
+      addMarker(updated);
+      renderHandlerList();
+      renderAllList();
+      loadRecords();
+      closeModal();
+    } catch(e) { alert('提交失败，请重试'); }
+  }
+
+  // ─── Tab switching ────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    ['report','handler','all'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+      document.getElementById(`panel-${t}`).style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'all') renderAllList();
+    if (tab === 'all') renderAllList();
+    if (markers) {
+      // Fit map to show all markers
+      if (records.length > 0) {
+        const lats = records.map(r => r.lat);
+        const lngs = records.map(r => r.lng);
+        map.fitBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]], { padding: [30, 30] });
+      }
+    }
+  }
+
+  // Map click to get coordinates
+  map.on('click', function(e) {
+    if (currentTab === 'report') {
+      document.getElementById('r-lat').value = parseFloat(e.latlng.lat.toFixed(6));
+      document.getElementById('r-lng').value = parseFloat(e.latlng.lng.toFixed(6));
+    }
+  });
+
+  // Init
   loadRecords();
 </script>
 </body>
