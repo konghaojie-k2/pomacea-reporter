@@ -9,7 +9,7 @@ env:
   SERVER_HOST: ${{ secrets.SERVER_HOST }}
   SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
   SERVER_USER: ${{ secrets.SERVER_USER || 'root' }}
-  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/root/pomacea-reporter' }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/admin/pomacea-reporter' }}
   API_PORT: ${{ secrets.API_PORT || '9000' }}
 
 jobs:
