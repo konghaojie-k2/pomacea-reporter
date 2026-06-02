@@ -6,13 +6,18 @@
 数据库：SQLite（/data/pomacea.db）
 """
 
-import json, uuid, os, sqlite3
+import json, uuid, os, sqlite3, time, mimetypes, re
 from datetime import datetime, timezone
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 PORT = 9000
 DB_FILE = "/data/pomacea.db"
+UPLOAD_DIR = "/data/uploads"
+ALLOWED_IMG_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_UPLOAD_SIZE = 8 * 1024 * 1024  # 8MB
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ─── 内嵌前端页面 ───────────────────────────────────
 FRONTEND_HTML = open(os.path.join(os.path.dirname(__file__), "frontend.html"), encoding="utf-8").read()
@@ -86,6 +91,76 @@ def _json(data, status=200):
     return status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json"
 
 
+def handle_upload(body, content_type):
+    """处理 multipart/form-data 上传，保存到 UPLOAD_DIR，返回 {"url": "..."}"""
+    # 简单 multipart 解析（仅支持单文件）
+    m = re.search(rb'boundary=([^;\s]+)', content_type.encode())
+    if not m:
+        return _json({"error": "需要 multipart/form-data"}, 400)
+    boundary = b"--" + m.group(1)
+    if len(body) > MAX_UPLOAD_SIZE:
+        return _json({"error": f"文件超过 {MAX_UPLOAD_SIZE//1024//1024}MB"}, 413)
+
+    parts = body.split(boundary)
+    for part in parts:
+        if b'filename="' not in part:
+            continue
+        # 解析文件
+        header_end = part.find(b"\r\n\r\n")
+        if header_end < 0:
+            continue
+        header = part[:header_end].decode("utf-8", errors="replace")
+        file_bytes = part[header_end+4:]
+        # 去掉末尾 \r\n
+        if file_bytes.endswith(b"\r\n"):
+            file_bytes = file_bytes[:-2]
+
+        # 提取 Content-Type
+        ct_m = re.search(r'Content-Type:\s*([^\r\n]+)', header, re.I)
+        ct = ct_m.group(1).strip() if ct_m else "application/octet-stream"
+
+        # 推断扩展名
+        ext = ".jpg"
+        if "png" in ct:
+            ext = ".png"
+        elif "webp" in ct:
+            ext = ".webp"
+        elif "gif" in ct:
+            ext = ".gif"
+        elif "jpeg" in ct or "jpg" in ct:
+            ext = ".jpg"
+        # 验证扩展名
+        if ext not in ALLOWED_IMG_EXT:
+            return _json({"error": f"不支持的图片格式: {ext}"}, 400)
+
+        # 生成文件名
+        fname = f"{int(time.time()*1000)}_{uuid.uuid4().hex[:8]}{ext}"
+        fpath = os.path.join(UPLOAD_DIR, fname)
+
+        with open(fpath, "wb") as f:
+            f.write(file_bytes)
+
+        # 拼 URL（用 HOST 头推断）
+        return _json({"url": f"/uploads/{fname}", "filename": fname, "size": len(file_bytes)})
+
+    return _json({"error": "没找到文件"}, 400)
+
+
+def serve_static(path):
+    """从 UPLOAD_DIR 提供静态文件"""
+    # 安全：禁止 .. 路径穿越
+    rel = path.lstrip("/")
+    if ".." in rel or rel.startswith("/"):
+        return None
+    fpath = os.path.join(UPLOAD_DIR, rel)
+    if not os.path.isfile(fpath):
+        return None
+    ctype, _ = mimetypes.guess_type(fpath)
+    ctype = ctype or "application/octet-stream"
+    with open(fpath, "rb") as f:
+        return f.read(), ctype
+
+
 def _load_all():
     with sqlite3.connect(DB_FILE) as conn:
         conn.row_factory = sqlite3.Row
@@ -109,6 +184,13 @@ def handle(req, path, body=b""):
 
     if p in ("/api/records", "/api/records/") and req == "POST":
         return handle_create(body)
+
+    if p.startswith("/uploads/"):
+        result = serve_static(p[len("/uploads/"):])
+        if result:
+            data, ctype = result
+            return 200, data, ctype
+        return 404, b'{"error":"not found"}', "application/json"
 
     if p.startswith("/api/records/") and req == "GET":
         rid = p.split("/")[-1]
@@ -238,7 +320,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length > 0 else b""
-        s, b, c = handle("POST", self.path, body)
+        ct = self.headers.get("Content-Type", "")
+        # 上传端点需要把 Content-Type 也带过去（multipart 解析要 boundary）
+        if urlparse(self.path).path == "/api/upload":
+            s, b, c = handle_upload(body, ct)
+        else:
+            s, b, c = handle("POST", self.path, body)
         self._respond(s, b, c)
 
     def do_PATCH(self):

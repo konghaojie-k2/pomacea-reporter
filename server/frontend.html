@@ -233,6 +233,13 @@
         <div class="form-group"><label>地址（可选）</label>
           <input type="text" id="r-addr" placeholder="例：苏州金鸡湖" />
         </div>
+        <div class="form-group"><label>现场照片（可选，JPG/PNG/WebP，≤8MB）</label>
+          <input type="file" id="r-photo" accept="image/jpeg,image/png,image/webp,image/gif" />
+          <div id="r-photo-preview" style="margin-top:0.4rem;display:none;">
+            <img id="r-photo-img" style="max-width:100%;max-height:200px;border-radius:8px;"/>
+            <button type="button" class="btn btn-secondary" style="margin-top:0.3rem;font-size:0.7rem;padding:0.2rem 0.5rem;" onclick="clearPhoto()">移除</button>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="submitRecord()">🐌 提交举报</button>
         <div id="r-msg" class="form-msg"></div>
       </div>
@@ -544,6 +551,7 @@
     const lng = parseFloat(document.getElementById('r-lng').value);
     const note = document.getElementById('r-note').value.trim();
     const address = document.getElementById('r-addr').value.trim();
+    const photoInput = document.getElementById('r-photo');
     const msg = document.getElementById('r-msg');
 
     if (!lat || !lng || !note) {
@@ -555,10 +563,23 @@
       return;
     }
     try {
+      // 1) 上传照片（如果有）
+      let photoUrl = '';
+      if (photoInput.files && photoInput.files[0]) {
+        msg.className = 'form-msg'; msg.textContent = '⏳ 上传照片中…';
+        const fd = new FormData();
+        fd.append('file', photoInput.files[0]);
+        const upRes = await fetch(`${API}/upload`, { method: 'POST', body: fd });
+        if (!upRes.ok) throw new Error('照片上传失败');
+        const upData = await upRes.json();
+        photoUrl = upData.url;
+      }
+
+      // 2) 提交记录
       const res = await fetch(`${API}/records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, note, address }),
+        body: JSON.stringify({ lat, lng, note, address, photo: photoUrl }),
       });
       if (!res.ok) throw new Error(await res.text());
       const r = await res.json();
@@ -568,6 +589,7 @@
       document.getElementById('r-lng').value = '';
       document.getElementById('r-note').value = '';
       document.getElementById('r-addr').value = '';
+      clearPhoto();
       addMarker(r);
       records.unshift(r);
       renderReportList();
@@ -579,6 +601,32 @@
       msg.className = 'form-msg err'; msg.textContent = '❌ 提交失败，请重试';
     }
   }
+
+  // ─── Photo preview ────────────────────────────────────
+  function onPhotoSelected(input) {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) {
+      alert('照片不能超过 8MB');
+      input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('r-photo-img').src = e.target.result;
+      document.getElementById('r-photo-preview').style.display = '';
+    };
+    reader.readAsDataURL(f);
+  }
+  function clearPhoto() {
+    const input = document.getElementById('r-photo');
+    if (input) input.value = '';
+    document.getElementById('r-photo-preview').style.display = 'none';
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('r-photo');
+    if (inp) inp.addEventListener('change', () => onPhotoSelected(inp));
+  });
 
   // ─── Submit handle ────────────────────────────────────
   async function submitHandle() {
