@@ -89,7 +89,7 @@ def _load_all():
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT id,lat,lng,note,address,photo,reporterId,createdAt,status,handler,handleTime,feedback "
-            "ORDER BY createdAt DESC"
+            "FROM records ORDER BY createdAt DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
