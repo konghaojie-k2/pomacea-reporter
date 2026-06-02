@@ -25,7 +25,7 @@ jobs:
           command_timeout: 8m
           timeout: 8m
           script: |
-            set -e
+            set +e  # 禁用 -e，确保下面所有诊断信息都能打印出来
             echo "=== $(date) 开始部署 ==="
             cd $DEPLOY_PATH
 
@@ -39,24 +39,40 @@ jobs:
             git reset --hard origin/master
 
             # 停止旧容器，删除旧镜像
-            docker compose down --rmi local --remove-orphans 2>/dev/null || true
+            docker compose down --rmi local --remove-orphans 2>/dev/null
 
             # 兜底：手动 docker run 残留的同名容器（不在 compose 管理内的）
-            docker rm -f pomacea-reporter 2>/dev/null || true
+            docker rm -f pomacea-reporter 2>/dev/null
 
-            # 构建并启动新容器
-            docker compose up -d --build
+            # 构建并启动新容器（强制无缓存，确保 frontend.html 改动生效）
+            docker compose build --no-cache
+            docker compose up -d
 
-            # 等待启动
-            sleep 5
+            # 等待启动（带重试，最长 30 秒）
+            echo "⏳ 等待应用启动..."
+            SUCCESS=0
+            for i in 1 2 3 4 5 6; do
+              sleep 5
+              if curl -sf http://localhost:9000/api/records > /dev/null 2>&1; then
+                echo "✅ 部署成功！第 $i 次（${i}x5s）"
+                echo "🌐 http://\$SERVER_HOST:9000"
+                SUCCESS=1
+                break
+              else
+                echo "   第 $i 次重试未就绪..."
+              fi
+            done
 
-            # 验证
-            if curl -sf http://localhost:9000/api/records > /dev/null 2>&1; then
-              echo "✅ 部署成功！"
-              echo "🌐 http://\$SERVER_HOST:9000"
-            else
-              echo "❌ 启动失败，容器日志:"
-              docker compose logs --tail=20
+            # 不论成功失败都打印诊断
+            echo "=== 📋 容器状态 ==="
+            docker compose ps
+            echo "=== 📋 容器日志（最近 30 行）==="
+            docker compose logs --tail=30
+            echo "=== 📋 端口监听检查 ==="
+            ss -tlnp 2>/dev/null | grep 9000 || netstat -tlnp 2>/dev/null | grep 9000 || echo "无 ss/netstat"
+
+            if [ $SUCCESS -eq 0 ]; then
+              echo "❌ 启动失败"
               exit 1
             fi
             echo "=== 部署完成 ==="
