@@ -69,7 +69,9 @@ def _init_db():
 
 
 def _now():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", ".000Z")
+    # 返回合法的 ISO 8601 UTC 时间戳（毫秒精度，Z 结尾）
+    # 之前 .replace("+00:00", ".000Z") 会拼出 "...000Z.000Z" 这种双小数，JS Date 解析不了 → NaN
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _cors():
