@@ -39,7 +39,10 @@ jobs:
             git reset --hard origin/master
 
             # 停止旧容器，删除旧镜像
-            docker compose down --rmi local 2>/dev/null || true
+            docker compose down --rmi local --remove-orphans 2>/dev/null || true
+
+            # 兜底：手动 docker run 残留的同名容器（不在 compose 管理内的）
+            docker rm -f pomacea-reporter 2>/dev/null || true
 
             # 构建并启动新容器
             docker compose up -d --build
