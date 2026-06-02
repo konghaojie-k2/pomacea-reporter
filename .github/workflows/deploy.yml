@@ -14,7 +14,7 @@ jobs:
       - name: 📥 克隆最新代码
         uses: actions/checkout@v4
 
-      - name: 🚀 通过 SSH 部署（Docker Compose）
+      - name: 🚀 通过 SSH 执行 deploy.sh
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -25,57 +25,8 @@ jobs:
           command_timeout: 8m
           timeout: 8m
           script: |
-            set +e  # 禁用 -e，确保下面所有诊断信息都能打印出来
-            echo "=== $(date) 开始部署 ==="
             cd $DEPLOY_PATH
-
-            # 拉取最新代码（若目录不是 git 仓库则自动初始化，兼容手动部署过的旧目录）
-            if [ ! -d .git ]; then
-              echo "📦 目录不是 git 仓库，初始化并关联远端..."
-              git init -q
-              git remote add origin https://github.com/konghaojie-k2/pomacea-reporter.git
-            fi
-            git fetch origin master
-            git reset --hard origin/master
-
-            # 停止旧容器，删除旧镜像
-            docker compose down --rmi local --remove-orphans 2>/dev/null
-
-            # 兜底：手动 docker run 残留的同名容器（不在 compose 管理内的）
-            docker rm -f pomacea-reporter 2>/dev/null
-
-            # 构建并启动新容器（强制无缓存，确保 frontend.html 改动生效）
-            docker compose build --no-cache
-            docker compose up -d
-
-            # 等待启动（带重试，最长 30 秒）
-            echo "⏳ 等待应用启动..."
-            SUCCESS=0
-            for i in 1 2 3 4 5 6; do
-              sleep 5
-              if curl -sf http://localhost:9000/api/records > /dev/null 2>&1; then
-                echo "✅ 部署成功！第 $i 次（${i}x5s）"
-                echo "🌐 http://\$SERVER_HOST:9000"
-                SUCCESS=1
-                break
-              else
-                echo "   第 $i 次重试未就绪..."
-              fi
-            done
-
-            # 不论成功失败都打印诊断
-            echo "=== 📋 容器状态 ==="
-            docker compose ps
-            echo "=== 📋 容器日志（最近 30 行）==="
-            docker compose logs --tail=30
-            echo "=== 📋 端口监听检查 ==="
-            ss -tlnp 2>/dev/null | grep 9000 || netstat -tlnp 2>/dev/null | grep 9000 || echo "无 ss/netstat"
-
-            if [ $SUCCESS -eq 0 ]; then
-              echo "❌ 启动失败"
-              exit 1
-            fi
-            echo "=== 部署完成 ==="
+            bash server/deploy.sh deploy
 
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/admin/pomacea-reporter' }}
