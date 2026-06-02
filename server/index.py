@@ -21,7 +21,10 @@ FRONTEND_HTML = open(os.path.join(os.path.dirname(__file__), "frontend.html"), e
 # ─── 数据库初始化 ───────────────────────────────────
 
 def _init_db():
+    """初始化数据库表结构。SQLite 不支持 ALTER TABLE ADD PRIMARY KEY，
+    所以对老库（缺少 id 等关键列）只能 DROP 重创。"""
     with sqlite3.connect(DB_FILE) as conn:
+        # 先确保 records 表存在
         conn.execute("""
             CREATE TABLE IF NOT EXISTS records (
                 id          TEXT PRIMARY KEY,
@@ -38,6 +41,31 @@ def _init_db():
                 feedback    TEXT DEFAULT NULL
             )
         """)
+        # 检查 schema 完整性：缺关键列则 DROP 重创（兼容旧版本残留）
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(records)").fetchall()}
+        required = {"id", "lat", "lng", "note", "createdAt", "status"}
+        missing = required - cols
+        if missing:
+            print(f"⚠️  检测到 records 表缺少列: {missing}，DROP 重创（数据会清空）")
+            conn.execute("DROP TABLE records")
+            conn.execute("""
+                CREATE TABLE records (
+                    id          TEXT PRIMARY KEY,
+                    lat         REAL NOT NULL,
+                    lng         REAL NOT NULL,
+                    note        TEXT NOT NULL,
+                    address     TEXT DEFAULT '',
+                    photo       TEXT DEFAULT '',
+                    reporterId  TEXT DEFAULT '',
+                    createdAt   TEXT NOT NULL,
+                    status      TEXT DEFAULT 'pending',
+                    handler     TEXT DEFAULT NULL,
+                    handleTime  TEXT DEFAULT NULL,
+                    feedback    TEXT DEFAULT NULL
+                )
+            """)
+            print("✅ records 表已重建")
+        conn.commit()
 
 
 def _now():
