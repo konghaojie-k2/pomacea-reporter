@@ -7,6 +7,8 @@ jobs:
   seed:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      API: http://47.85.36.226:9000
 
     steps:
       - name: 📍 苏州活力岛（带照片）
