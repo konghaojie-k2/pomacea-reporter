@@ -193,16 +193,51 @@
       .tab-btn { padding: 0.6rem 0.7rem; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
       .tab-btn .badge { font-size: 0.6rem; padding: 0.05rem 0.3rem; }
 
-      /* 主布局：侧栏在上，地图在下 */
+      /* 主布局：地图主视图 + 底部抽屉列表 */
       .main-layout {
         display: flex; flex-direction: column;
         height: auto; min-height: calc(100vh - 110px);
+        position: relative;
+      }
+      #map {
+        height: calc(100vh - 110px);
+        min-height: 320px;
+        order: 1;
       }
       .sidebar {
-        border-right: none; border-bottom: 1px solid var(--gray-200);
-        max-height: 45vh; padding: 0.6rem;
+        border-right: none; border-top: 1px solid var(--gray-200);
+        padding: 0.5rem;
+        position: fixed; left: 0; right: 0; bottom: 0;
+        background: white; z-index: 1500;
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.1);
+        max-height: 50vh; overflow-y: auto;
+        border-radius: 16px 16px 0 0;
+        order: 2;
+        transition: transform 0.3s ease, max-height 0.3s ease;
+        transform: translateY(calc(100% - 80px));   /* 默认只露 80px 把手 */
       }
-      #map { height: 50vh; min-height: 280px; }
+      .sidebar.expanded {
+        transform: translateY(0);
+        max-height: 85vh;
+      }
+      /* 抽屉把手 */
+      .sidebar::before {
+        content: '';
+        display: block;
+        width: 40px; height: 4px;
+        background: var(--gray-200);
+        border-radius: 2px;
+        margin: 0 auto 0.5rem;
+      }
+      /* 地图/侧栏显隐控制（移动端） */
+      .main-layout.list-only #map { display: none; }
+      .main-layout.list-only .sidebar {
+        position: static;
+        transform: none;
+        max-height: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
 
       /* 表单元素：44px 触控目标 */
       input, select, textarea {
@@ -250,6 +285,23 @@
     @media (hover: none) and (pointer: coarse) {
       .record-card:hover { border-color: var(--gray-200); box-shadow: none; }   /* 取消 hover */
       .btn:hover { transform: none; }
+    }
+
+    /* 移动端浮动切换按钮（仅 ≤768px 可见） */
+    .mobile-toggle {
+      display: none;
+      position: fixed; right: 1rem; bottom: 100px;
+      z-index: 1600;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--green); color: white;
+      border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-size: 1.4rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .mobile-toggle:active { transform: scale(0.95); }
+    @media (max-width: 768px) {
+      .mobile-toggle { display: flex; align-items: center; justify-content: center; }
     }
   </style>
 </head>
@@ -397,6 +449,9 @@
   <div id="map"></div>
 
 </div><!-- /main-layout -->
+
+<!-- 移动端浮动切换按钮 -->
+<button class="mobile-toggle" id="mobileToggle" onclick="toggleMobileView()" title="切换列表/地图">📋</button>
 
 <!-- Handle modal (for map popup) -->
 <div class="modal-overlay" id="handleModal">
@@ -802,11 +857,35 @@
       document.getElementById(`panel-${t}`).style.display = t === tab ? '' : 'none';
     });
     if (tab === 'all') renderAllList();
+
+    // 移动端布局：根据 tab 切换 main-layout 行为
+    const layout = document.querySelector('.main-layout');
+    const sidebar = document.querySelector('.sidebar');
+    const toggleBtn = document.getElementById('mobileToggle');
+    if (window.innerWidth <= 768) {
+      if (tab === 'all') {
+        // 全部地图 tab：地图全屏 + 列表作为底部抽屉
+        sidebar.classList.remove('expanded');
+        layout.classList.remove('list-only');
+        toggleBtn.style.display = 'flex';
+        toggleBtn.textContent = '📋';
+        toggleBtn.title = '查看列表';
+      } else {
+        // 处理中心 / 举报 tab：列表全屏（无地图）
+        layout.classList.add('list-only');
+        sidebar.classList.remove('expanded');
+        toggleBtn.style.display = 'none';
+      }
+    } else {
+      toggleBtn.style.display = 'none';
+      layout.classList.remove('list-only');
+    }
+
     // 切到地图 tab 或窗口大小变化时，让 Leaflet 重新计算容器尺寸
     setTimeout(() => {
       if (typeof map !== 'undefined' && map) map.invalidateSize();
     }, 50);
-    if (markers && records.length > 0) {
+    if (tab === 'all' && markers && records.length > 0) {
       const lats = records.map(r => r.lat);
       const lngs = records.map(r => r.lng);
       map.fitBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]], { padding: [30, 30] });
@@ -816,6 +895,44 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
+
+  // 移动端切换：地图 ↔ 列表
+  function toggleMobileView() {
+    const layout = document.querySelector('.main-layout');
+    const sidebar = document.querySelector('.sidebar');
+    const btn = document.getElementById('mobileToggle');
+    if (layout.classList.contains('list-only')) {
+      // 当前是列表全屏 → 切到地图
+      layout.classList.remove('list-only');
+      sidebar.classList.remove('expanded');
+      btn.textContent = '📋';
+      btn.title = '查看列表';
+      setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+    } else {
+      // 当前是地图全屏 → 切到列表全屏
+      layout.classList.add('list-only');
+      btn.textContent = '🗺️';
+      btn.title = '查看地图';
+    }
+  }
+
+  // 点击侧栏 peek 区域也能展开
+  document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      sidebar.addEventListener('click', (e) => {
+        if (window.innerWidth > 768) return;
+        // 只有点中抽屉把手（顶部 80px 内）才触发
+        const rect = sidebar.getBoundingClientRect();
+        const clickY = e.clientY - rect.top;
+        if (clickY < 80 && !sidebar.classList.contains('expanded') &&
+            document.querySelector('.main-layout').classList.contains('list-only') === false) {
+          sidebar.classList.toggle('expanded');
+          setTimeout(() => { if (map) map.invalidateSize(); }, 350);
+        }
+      });
+    }
+  });
 
   // 监听窗口变化，重新计算地图
   window.addEventListener('resize', () => {
