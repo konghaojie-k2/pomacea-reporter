@@ -9,6 +9,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # 强制使用 Node.js 24（GitHub Actions 将在 2026-06-16 默认升级）
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
     steps:
       - name: 📥 克隆最新代码
