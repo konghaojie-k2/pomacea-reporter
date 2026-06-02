@@ -127,6 +127,30 @@
     .popup-content .popup-status { display: inline-block; margin: 0.2rem 0; padding: 0.1rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
     .popup-content small { font-size: 0.7rem; color: var(--gray-500); }
 
+    /* Photo marker (带照片的发现点) */
+    .photo-marker { background: transparent; border: none; }
+    .photo-marker-inner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      overflow: hidden; position: relative;
+      background: #f3f4f6;
+    }
+    .photo-marker-inner img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .photo-marker-fallback {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; color: white;
+    }
+    .photo-marker-dot {
+      position: absolute; bottom: -2px; right: -2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
     /* Handle panel (shown when record selected in handler view) */
     .handle-panel { display: none; }
     .handle-panel.visible { display: block; }
@@ -176,14 +200,14 @@
 
 <!-- Tab nav -->
 <nav class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('report')" id="tab-report">
-    📍 我要举报 <span class="badge" id="badge-report">入口</span>
-  </button>
-  <button class="tab-btn" onclick="switchTab('handler')" id="tab-handler">
+  <button class="tab-btn active" onclick="switchTab('handler')" id="tab-handler">
     🏛️ 处理中心 <span class="badge" id="badge-handler">0</span>
   </button>
   <button class="tab-btn" onclick="switchTab('all')" id="tab-all">
     🗺️ 全部地图 <span class="badge" id="badge-all">--</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('report')" id="tab-report">
+    📍 我要举报 <span class="badge" id="badge-report">入口</span>
   </button>
 </nav>
 
@@ -194,7 +218,7 @@
   <div class="sidebar">
 
     <!-- ── TAB: 举报 ── -->
-    <div id="panel-report">
+    <div id="panel-report" style="display:none;">
       <div class="panel">
         <div class="panel-title">📍 上报新发现</div>
         <div class="form-group"><label>纬度</label>
@@ -226,7 +250,7 @@
     </div>
 
     <!-- ── TAB: 处理中心 ── -->
-    <div id="panel-handler" style="display:none;">
+    <div id="panel-handler">
       <div class="panel">
         <div class="panel-title">🏛️ 处理操作</div>
         <div id="handler-selected" style="font-size:0.82rem;color:var(--gray-500);text-align:center;padding:0.5rem;">
@@ -319,7 +343,7 @@
   let records = [];
   let markers = {};
   let selectedId = null;
-  let currentTab = 'report';
+  let currentTab = 'handler';  // 默认进入处理中心（agent 时代人工举报用得少）
 
   // ─── Map ─────────────────────────────────────────────
   const map = L.map('map').setView([31.0, 120.6], 8);
@@ -357,8 +381,15 @@
            ${r.handler ? `<br><span style="font-size:0.68rem;opacity:0.8;">— ${r.handler} ${r.handleTime ? '@'+fmtDate(r.handleTime) : ''}</span>` : ''}
          </div>`
       : '';
+    const photoHtml = r.photo
+      ? `<a href="${r.photo}" target="_blank" rel="noopener">
+           <img src="${r.photo}" alt="现场照片" loading="lazy"
+             style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin:0.3rem 0;display:block;"/>
+         </a>`
+      : '';
     return `<div class="popup-content">
       <h4>🐌 福寿螺发现点</h4>
+      ${photoHtml}
       <p>${r.note || '无描述'}</p>
       <p>📍 ${r.address || '未知地址'}</p>
       <p>🗓 ${fmtDate(r.createdAt)}</p>
@@ -371,10 +402,28 @@
   function addMarker(r) {
     if (markers[r.id]) map.removeLayer(markers[r.id]);
     const c = STATUS_CONFIG[r.status] || STATUS_CONFIG.pending;
-    const m = L.circleMarker([r.lat, r.lng], {
-      radius: 10, fillColor: c.color, color: 'white', weight: 2,
-      fillOpacity: 0.85,
-    }).bindPopup(renderPopup(r), { maxWidth: 280 });
+    // 有照片：用缩略图作为 marker（thumbnail-style 圆形头像）
+    // 无照片：退回原来的彩色圆点
+    let m;
+    if (r.photo) {
+      const icon = L.divIcon({
+        className: 'photo-marker',
+        html: `<div class="photo-marker-inner" style="border-color:${c.color};">
+          <img src="${r.photo}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<div class=&quot;photo-marker-fallback&quot; style=&quot;background:${c.color};&quot;>🐌</div>'"/>
+          <span class="photo-marker-dot" style="background:${c.color};"></span>
+        </div>`,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+        popupAnchor: [0, -22],
+      });
+      m = L.marker([r.lat, r.lng], { icon });
+    } else {
+      m = L.circleMarker([r.lat, r.lng], {
+        radius: 10, fillColor: c.color, color: 'white', weight: 2,
+        fillOpacity: 0.85,
+      });
+    }
+    m.bindPopup(renderPopup(r), { maxWidth: 280 });
     markers[r.id] = m;
     m.addTo(map);
   }
