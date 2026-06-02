@@ -169,6 +169,88 @@
     /* Empty state */
     .empty-state { text-align: center; padding: 2rem 1rem; color: var(--gray-500); font-size: 0.85rem; }
     .empty-state .emoji { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
+
+    /* ════════════════════════════════════════════════
+       移动端优化（≤768px）
+       ════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Header：紧凑 */
+      .header-inner { padding: 0.6rem 0.8rem; gap: 0.5rem; }
+      .brand-icon { font-size: 1.5rem; }
+      .brand h1 { font-size: 1rem; }
+      .brand span { display: none; }   /* 副标题隐藏 */
+      .header-stats { gap: 0.6rem; }
+      .hstat strong { font-size: 1.1rem; }
+      .hstat small { font-size: 0.6rem; }
+
+      /* 警示条 */
+      .alert-bar { padding: 0.4rem 0.8rem; font-size: 0.72rem; line-height: 1.3; }
+
+      /* Tab nav：横向滚动 */
+      .tab-nav { padding: 0 0.4rem; overflow-x: auto; -webkit-overflow-scrolling: touch;
+                 scrollbar-width: none; }
+      .tab-nav::-webkit-scrollbar { display: none; }
+      .tab-btn { padding: 0.6rem 0.7rem; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
+      .tab-btn .badge { font-size: 0.6rem; padding: 0.05rem 0.3rem; }
+
+      /* 主布局：侧栏在上，地图在下 */
+      .main-layout {
+        display: flex; flex-direction: column;
+        height: auto; min-height: calc(100vh - 110px);
+      }
+      .sidebar {
+        border-right: none; border-bottom: 1px solid var(--gray-200);
+        max-height: 45vh; padding: 0.6rem;
+      }
+      #map { height: 50vh; min-height: 280px; }
+
+      /* 表单元素：44px 触控目标 */
+      input, select, textarea {
+        font-size: 16px !important;   /* 避免 iOS 自动缩放 */
+        min-height: 44px; padding: 0.7rem 0.8rem;
+      }
+      textarea { min-height: 60px; }
+      .btn { min-height: 44px; padding: 0.7rem 1rem; font-size: 0.9rem; }
+
+      /* 记录卡片：增加点击区 */
+      .record-card { padding: 0.9rem; }
+      .rc-note { font-size: 0.85rem; }
+
+      /* Photo marker：缩小 */
+      .photo-marker-inner { width: 32px; height: 32px; border-width: 2px; }
+      .photo-marker-dot { width: 10px; height: 10px; }
+      .photo-marker-fallback { font-size: 16px; }
+
+      /* Modal：全屏 */
+      .modal-overlay { padding: 0; align-items: flex-end; }
+      .modal { max-width: 100%; border-radius: 16px 16px 0 0;
+               max-height: 85vh; overflow-y: auto; padding: 1.2rem; }
+      .modal h3 { font-size: 1.05rem; }
+
+      /* Leaflet popup：自适应 */
+      .leaflet-popup-content-wrapper { max-width: 240px; }
+      .popup-content { min-width: 0; }
+      .popup-content img { max-height: 150px !important; }
+    }
+
+    /* 超小屏（≤380px）：进一步压缩 */
+    @media (max-width: 380px) {
+      .header-stats { gap: 0.4rem; }
+      .hstat strong { font-size: 0.95rem; }
+      .tab-btn { padding: 0.55rem 0.55rem; font-size: 0.72rem; }
+      .sidebar { padding: 0.5rem; }
+    }
+
+    /* 平板优化（769-1024px）：侧栏稍宽 */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .main-layout { grid-template-columns: 300px 1fr; }
+    }
+
+    /* 触摸设备优化 */
+    @media (hover: none) and (pointer: coarse) {
+      .record-card:hover { border-color: var(--gray-200); box-shadow: none; }   /* 取消 hover */
+      .btn:hover { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -720,16 +802,27 @@
       document.getElementById(`panel-${t}`).style.display = t === tab ? '' : 'none';
     });
     if (tab === 'all') renderAllList();
-    if (tab === 'all') renderAllList();
-    if (markers) {
-      // Fit map to show all markers
-      if (records.length > 0) {
-        const lats = records.map(r => r.lat);
-        const lngs = records.map(r => r.lng);
-        map.fitBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]], { padding: [30, 30] });
-      }
+    // 切到地图 tab 或窗口大小变化时，让 Leaflet 重新计算容器尺寸
+    setTimeout(() => {
+      if (typeof map !== 'undefined' && map) map.invalidateSize();
+    }, 50);
+    if (markers && records.length > 0) {
+      const lats = records.map(r => r.lat);
+      const lngs = records.map(r => r.lng);
+      map.fitBounds([[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]], { padding: [30, 30] });
+    }
+    // 移动端切 tab 时滚到顶部
+    if (window.innerWidth <= 768) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
+
+  // 监听窗口变化，重新计算地图
+  window.addEventListener('resize', () => {
+    if (typeof map !== 'undefined' && map) {
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+  });
 
   // Map click to get coordinates
   map.on('click', function(e) {
