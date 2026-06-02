@@ -29,8 +29,14 @@ jobs:
             echo "=== $(date) 开始部署 ==="
             cd $DEPLOY_PATH
 
-            # 拉取最新代码
-            git pull origin master
+            # 拉取最新代码（若目录不是 git 仓库则自动初始化，兼容手动部署过的旧目录）
+            if [ ! -d .git ]; then
+              echo "📦 目录不是 git 仓库，初始化并关联远端..."
+              git init -q
+              git remote add origin https://github.com/konghaojie-k2/pomacea-reporter.git
+            fi
+            git fetch origin master
+            git reset --hard origin/master
 
             # 停止旧容器，删除旧镜像
             docker compose down --rmi local 2>/dev/null || true
