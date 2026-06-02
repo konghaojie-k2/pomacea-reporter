@@ -1,0 +1,51 @@
+name: 🌱 注入测试数据
+
+on:
+  workflow_dispatch:    # 手动触发，避免污染生产数据
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📍 苏州活力岛（带照片）
+        run: |
+          curl -sf -X POST "$API/records" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "lat": 31.3681,
+              "lng": 120.6126,
+              "note": "木栈道柱子及周围植物上爬满粉红色卵簇",
+              "address": "江苏省苏州市相城区元和街道御窑路隧道活力岛",
+              "photo": "https://images.unsplash.com/photo-1582546923484-30a8ea8c0b1d?w=400",
+              "reporterId": "agent-test-001"
+            }' | tee /tmp/r1.json
+          echo ""
+
+      - name: 📍 苏州相城区河道（无照片，测试 fallback）
+        run: |
+          curl -sf -X POST "$API/records" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "lat": 31.3702,
+              "lng": 120.6188,
+              "note": "河道护坡发现 3 处粉红色卵块，需要尽快处理",
+              "address": "江苏省苏州市相城区元和街道",
+              "reporterId": "agent-test-002"
+            }' | tee /tmp/r2.json
+          echo ""
+
+      - name: ✅ 验证写入
+        run: |
+          echo "=== 当前数据库内容 ==="
+          curl -sf "$API/records" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(f'总数: {d[\"total\"]}')
+for r in d['records']:
+    photo = '📷' if r.get('photo') else '⬜'
+    print(f'  {photo} [{r[\"status\"]}] {r[\"address\"][:40]} - {r[\"createdAt\"]}')
+"
+        env:
+          API: http://47.85.36.226:9000
